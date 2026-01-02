@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Menu, X, User, LogOut, Bookmark, MapPin, ChevronDown } from 'lucide-react'
+import { Menu, X, User, LogOut, Settings, Heart } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -19,7 +19,7 @@ export function Header() {
   const navigate = useNavigate()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [authDialogOpen, setAuthDialogOpen] = useState(false)
-  const [authMode, setAuthMode] = useState('signin')
+  const [authMode, setAuthMode] = useState('signin') // 'signin' or 'signup'
   const [authLoading, setAuthLoading] = useState(false)
   const [formData, setFormData] = useState({
     email: '',
@@ -71,93 +71,75 @@ export function Header() {
     navigate('/')
   }
 
-  const neighborhoodName = profile?.neighborhood?.name
-
   return (
     <>
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-lg border-b border-warm-200/60">
+      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-md border-b">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
-            <Link to="/" className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-sm">
-                <span className="text-white text-xl">🏘️</span>
+            <Link to="/" className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                <span className="text-white font-bold text-lg">N</span>
               </div>
-              <div className="hidden sm:block">
-                <span className="font-semibold text-lg text-warm-900">
-                  Neighborhood Pros
-                </span>
-                {neighborhoodName && (
-                  <span className="flex items-center gap-1 text-xs text-warm-500">
-                    <MapPin size={10} />
-                    {neighborhoodName}
-                  </span>
-                )}
-              </div>
+              <span className="font-display font-semibold text-xl hidden sm:block">
+                Neighborhood Pros
+              </span>
             </Link>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-1">
-              <Link to="/">
-                <Button variant="ghost" className="text-warm-600 hover:text-warm-900 hover:bg-warm-100">
-                  Find Pros
-                </Button>
+            <nav className="hidden md:flex items-center gap-6">
+              <Link 
+                to="/" 
+                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Browse
               </Link>
               {user && (
-                <Link to="/favorites">
-                  <Button variant="ghost" className="text-warm-600 hover:text-warm-900 hover:bg-warm-100">
-                    <Bookmark size={18} className="mr-1.5" />
-                    Saved
-                  </Button>
+                <Link 
+                  to="/favorites" 
+                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  My Favorites
                 </Link>
               )}
             </nav>
 
             {/* Auth Buttons */}
-            <div className="hidden md:flex items-center gap-2">
+            <div className="hidden md:flex items-center gap-3">
               {loading ? (
-                <div className="w-8 h-8 rounded-full bg-warm-100 animate-pulse" />
+                <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
               ) : user ? (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <Link to="/profile">
-                    <Button variant="ghost" className="gap-2 text-warm-700">
-                      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                        <User size={16} className="text-green-600" />
-                      </div>
-                      <span className="max-w-[120px] truncate">
-                        {profile?.full_name || 'Profile'}
-                      </span>
+                    <Button variant="ghost" size="sm" className="gap-2">
+                      <User size={16} />
+                      {profile?.full_name || 'Profile'}
                     </Button>
                   </Link>
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={handleSignOut}
-                    className="text-warm-400 hover:text-warm-600"
-                  >
-                    <LogOut size={18} />
+                  <Button variant="outline" size="sm" onClick={handleSignOut}>
+                    <LogOut size={16} />
                   </Button>
                 </div>
               ) : (
                 <>
                   <Button 
-                    variant="ghost"
+                    variant="ghost" 
+                    size="sm"
                     onClick={() => {
                       setAuthMode('signin')
                       setAuthDialogOpen(true)
                     }}
-                    className="text-warm-600"
                   >
                     Sign In
                   </Button>
                   <Button 
+                    size="sm"
                     onClick={() => {
                       setAuthMode('signup')
                       setAuthDialogOpen(true)
                     }}
-                    className="bg-green-600 hover:bg-green-700 text-white btn-press"
                   >
-                    Join Your Neighbors
+                    Get Started
                   </Button>
                 </>
               )}
@@ -182,85 +164,71 @@ export function Header() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="md:hidden border-t border-warm-100 bg-white"
+              className="md:hidden border-t bg-background"
             >
-              <div className="container mx-auto px-4 py-4 flex flex-col gap-1">
+              <div className="container mx-auto px-4 py-4 flex flex-col gap-2">
                 <Link 
                   to="/" 
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-warm-50 transition-colors"
+                  className="px-4 py-3 rounded-lg hover:bg-muted transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  <span className="text-lg">🔍</span>
-                  <span className="font-medium text-warm-800">Find Pros</span>
+                  Browse Professionals
                 </Link>
-                
                 {user && (
                   <Link 
                     to="/favorites" 
-                    className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-warm-50 transition-colors"
+                    className="px-4 py-3 rounded-lg hover:bg-muted transition-colors flex items-center gap-2"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    <Bookmark size={20} className="text-warm-500" />
-                    <span className="font-medium text-warm-800">Saved Pros</span>
+                    <Heart size={18} />
+                    My Favorites
                   </Link>
                 )}
-                
-                <div className="border-t border-warm-100 my-2" />
-                
+                <div className="border-t my-2" />
                 {user ? (
                   <>
                     <Link 
                       to="/profile" 
-                      className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-warm-50 transition-colors"
+                      className="px-4 py-3 rounded-lg hover:bg-muted transition-colors flex items-center gap-2"
                       onClick={() => setMobileMenuOpen(false)}
                     >
-                      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                        <User size={16} className="text-green-600" />
-                      </div>
-                      <div>
-                        <span className="font-medium text-warm-800 block">
-                          {profile?.full_name || 'Profile'}
-                        </span>
-                        {neighborhoodName && (
-                          <span className="text-xs text-warm-500">{neighborhoodName}</span>
-                        )}
-                      </div>
+                      <User size={18} />
+                      {profile?.full_name || 'Profile'}
                     </Link>
                     <button 
-                      className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-warm-50 transition-colors w-full text-left"
+                      className="px-4 py-3 rounded-lg hover:bg-muted transition-colors flex items-center gap-2 text-left w-full"
                       onClick={() => {
                         handleSignOut()
                         setMobileMenuOpen(false)
                       }}
                     >
-                      <LogOut size={20} className="text-warm-400" />
-                      <span className="text-warm-600">Sign Out</span>
+                      <LogOut size={18} />
+                      Sign Out
                     </button>
                   </>
                 ) : (
-                  <div className="flex flex-col gap-2 px-2">
-                    <Button 
-                      variant="outline"
+                  <>
+                    <button 
+                      className="px-4 py-3 rounded-lg hover:bg-muted transition-colors text-left"
                       onClick={() => {
                         setAuthMode('signin')
                         setAuthDialogOpen(true)
                         setMobileMenuOpen(false)
                       }}
-                      className="w-full justify-center"
                     >
                       Sign In
-                    </Button>
+                    </button>
                     <Button 
+                      className="mx-4"
                       onClick={() => {
                         setAuthMode('signup')
                         setAuthDialogOpen(true)
                         setMobileMenuOpen(false)
                       }}
-                      className="w-full justify-center bg-green-600 hover:bg-green-700"
                     >
-                      Join Your Neighbors
+                      Get Started
                     </Button>
-                  </div>
+                  </>
                 )}
               </div>
             </motion.div>
@@ -270,48 +238,43 @@ export function Header() {
 
       {/* Auth Dialog */}
       <Dialog open={authDialogOpen} onOpenChange={setAuthDialogOpen}>
-        <DialogContent className="sm:max-w-md border-0 shadow-xl">
-          <DialogHeader className="text-center sm:text-center">
-            <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center mb-4">
-              <span className="text-2xl">🏘️</span>
-            </div>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
             <DialogTitle className="text-2xl">
-              {authMode === 'signin' ? 'Welcome back' : 'Join your neighbors'}
+              {authMode === 'signin' ? 'Welcome back' : 'Create an account'}
             </DialogTitle>
-            <DialogDescription className="text-warm-500">
+            <DialogDescription>
               {authMode === 'signin' 
-                ? 'Sign in to save favorites and recommend pros.'
-                : 'Discover trusted local professionals in your community.'}
+                ? 'Sign in to save favorites and recommend professionals.'
+                : 'Join your neighborhood and discover trusted local pros.'}
             </DialogDescription>
           </DialogHeader>
           
           <form onSubmit={handleAuthSubmit} className="space-y-4 mt-4">
             {authMode === 'signup' && (
               <div className="space-y-2">
-                <label className="text-sm font-medium text-warm-700">Full Name</label>
+                <label className="text-sm font-medium">Full Name</label>
                 <Input
                   type="text"
                   placeholder="Your name"
                   value={formData.fullName}
                   onChange={(e) => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
                   required={authMode === 'signup'}
-                  className="h-12"
                 />
               </div>
             )}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-warm-700">Email</label>
+              <label className="text-sm font-medium">Email</label>
               <Input
                 type="email"
                 placeholder="you@example.com"
                 value={formData.email}
                 onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                 required
-                className="h-12"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-warm-700">Password</label>
+              <label className="text-sm font-medium">Password</label>
               <Input
                 type="password"
                 placeholder="••••••••"
@@ -319,25 +282,20 @@ export function Header() {
                 onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
                 required
                 minLength={6}
-                className="h-12"
               />
             </div>
             
-            <Button 
-              type="submit" 
-              className="w-full h-12 bg-green-600 hover:bg-green-700 text-base btn-press" 
-              disabled={authLoading}
-            >
-              {authLoading ? 'Please wait...' : authMode === 'signin' ? 'Sign In' : 'Create Account'}
+            <Button type="submit" className="w-full" disabled={authLoading}>
+              {authLoading ? 'Loading...' : authMode === 'signin' ? 'Sign In' : 'Create Account'}
             </Button>
           </form>
 
-          <div className="mt-4 text-center text-sm text-warm-500">
+          <div className="mt-4 text-center text-sm text-muted-foreground">
             {authMode === 'signin' ? (
               <>
-                New to the neighborhood?{' '}
+                Don't have an account?{' '}
                 <button 
-                  className="text-green-600 hover:text-green-700 font-medium"
+                  className="text-primary hover:underline"
                   onClick={() => setAuthMode('signup')}
                 >
                   Sign up
@@ -347,7 +305,7 @@ export function Header() {
               <>
                 Already have an account?{' '}
                 <button 
-                  className="text-green-600 hover:text-green-700 font-medium"
+                  className="text-primary hover:underline"
                   onClick={() => setAuthMode('signin')}
                 >
                   Sign in
