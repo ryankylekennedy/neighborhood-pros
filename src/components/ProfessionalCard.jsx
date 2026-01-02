@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
-import { User, Heart, Bookmark, Trophy } from 'lucide-react'
-import { Card, CardTitle } from '@/components/ui/card'
+import { User, Heart, Bookmark, MapPin, Star, CheckCircle2 } from 'lucide-react'
+import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -19,7 +19,8 @@ export function ProfessionalCard({
     emoji, 
     category,
     subcategories = [],
-    recommendations = []
+    recommendations = [],
+    description
   } = professional
 
   const subcategoryList = subcategories
@@ -37,104 +38,126 @@ export function ProfessionalCard({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: animationDelay }}
-      whileTap={{ scale: 0.98 }}
+      transition={{ duration: 0.4, delay: animationDelay, ease: [0.25, 0.1, 0.25, 1] }}
     >
       <Card 
         className={cn(
-          "hover:shadow-lg transition-all duration-300 overflow-hidden cursor-pointer group",
-          isPreferred && "ring-2 ring-primary/30 bg-primary/[0.02]"
+          "group relative overflow-hidden cursor-pointer card-hover border-0 shadow-sm",
+          isPreferred && "favorite-highlight"
         )}
         onClick={() => onClick?.(professional)}
       >
-        <div className="flex flex-row gap-4 p-4">
-          {/* Avatar */}
-          <div className="relative flex-shrink-0 w-16 h-16 rounded-full overflow-hidden bg-gradient-to-br from-primary/20 via-background to-accent/10">
-            {photo_url ? (
-              <img
-                src={photo_url}
-                alt={name || "Professional"}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                {emoji ? (
-                  <span className="text-2xl">{emoji}</span>
+        <div className="p-5">
+          {/* Top row: Avatar + Bookmark */}
+          <div className="flex items-start justify-between mb-4">
+            {/* Avatar */}
+            <div className="relative">
+              <div className={cn(
+                "w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center",
+                "bg-gradient-to-br from-green-100 to-green-50",
+                "ring-2 ring-white shadow-sm"
+              )}>
+                {photo_url ? (
+                  <img
+                    src={photo_url}
+                    alt={name || "Professional"}
+                    className="w-full h-full object-cover"
+                  />
+                ) : emoji ? (
+                  <span className="text-3xl">{emoji}</span>
                 ) : (
-                  <User className="h-8 w-8 text-primary/60" strokeWidth={1.5} />
+                  <User className="h-8 w-8 text-green-600" strokeWidth={1.5} />
                 )}
               </div>
-            )}
-          </div>
-          
-          {/* Content */}
-          <div className="flex-1 flex flex-col gap-2 min-w-0">
-            {/* Header */}
-            <div className="flex items-start justify-between gap-2">
-              <CardTitle className="text-base line-clamp-2 break-words group-hover:text-primary transition-colors">
-                {name || "Unnamed Professional"}
-              </CardTitle>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleFavoriteClick}
-                className="flex-shrink-0 h-8 w-8 hover:bg-primary/10"
-              >
-                <Bookmark
-                  size={18}
-                  className={cn(
-                    "transition-colors",
-                    isFavorite ? "fill-primary text-primary" : "text-muted-foreground"
-                  )}
-                />
-              </Button>
-            </div>
-            
-            {/* Badges Row */}
-            <div className="flex items-center gap-2 flex-wrap">
+              
+              {/* Verified badge */}
               {isPreferred && (
-                <Badge variant="default" className="gap-1 text-xs bg-primary/90">
-                  <Trophy size={12} />
-                  Neighborhood Favorite
-                </Badge>
-              )}
-              {category?.name && (
-                <Badge variant="secondary" className="text-xs">
-                  {category.emoji && <span className="mr-1">{category.emoji}</span>}
-                  {category.name}
-                </Badge>
-              )}
-              {recommendationsCount > 0 && (
-                <div className="flex items-center gap-1 text-xs font-semibold text-primary">
-                  <Heart size={14} className="fill-current" />
-                  <span>{recommendationsCount} {recommendationsCount === 1 ? 'Neighbor' : 'Neighbors'}</span>
+                <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center ring-2 ring-white">
+                  <CheckCircle2 className="w-4 h-4 text-white" fill="currentColor" />
                 </div>
               )}
             </div>
-            
-            {/* Subcategories */}
-            {subcategoryList.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {subcategoryList.slice(0, 3).map((label, index) => (
-                  <Badge 
-                    key={index} 
-                    variant="outline" 
-                    className="text-xs px-2 py-0.5"
-                  >
-                    {label}
-                  </Badge>
-                ))}
-                {subcategoryList.length > 3 && (
-                  <Badge variant="outline" className="text-xs px-2 py-0.5">
-                    +{subcategoryList.length - 3}
-                  </Badge>
+
+            {/* Bookmark button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleFavoriteClick}
+              className={cn(
+                "h-10 w-10 rounded-full btn-press",
+                "hover:bg-green-50",
+                isFavorite && "bg-green-50"
+              )}
+            >
+              <Bookmark
+                size={20}
+                className={cn(
+                  "transition-colors",
+                  isFavorite ? "fill-green-600 text-green-600" : "text-warm-400"
                 )}
-              </div>
+              />
+            </Button>
+          </div>
+
+          {/* Name and category */}
+          <div className="mb-3">
+            <h3 className="font-semibold text-lg text-warm-900 group-hover:text-green-700 transition-colors line-clamp-1">
+              {name || "Unnamed Professional"}
+            </h3>
+            {category?.name && (
+              <p className="text-sm text-warm-500 flex items-center gap-1.5 mt-0.5">
+                {category.emoji && <span>{category.emoji}</span>}
+                {category.name}
+              </p>
             )}
           </div>
+
+          {/* Trust indicators */}
+          <div className="flex items-center gap-3 mb-3">
+            {isPreferred && (
+              <span className="trust-badge">
+                <MapPin size={12} />
+                Neighborhood Favorite
+              </span>
+            )}
+            {recommendationsCount > 0 && (
+              <span className="inline-flex items-center gap-1 text-sm font-medium text-green-700">
+                <Heart size={14} className="fill-green-600 text-green-600" />
+                {recommendationsCount} neighbor{recommendationsCount !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+
+          {/* Services tags */}
+          {subcategoryList.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {subcategoryList.slice(0, 3).map((label, index) => (
+                <span 
+                  key={index} 
+                  className="inline-flex px-2.5 py-1 bg-warm-100 text-warm-600 text-xs font-medium rounded-full"
+                >
+                  {label}
+                </span>
+              ))}
+              {subcategoryList.length > 3 && (
+                <span className="inline-flex px-2.5 py-1 bg-warm-100 text-warm-500 text-xs font-medium rounded-full">
+                  +{subcategoryList.length - 3} more
+                </span>
+              )}
+            </div>
+          )}
         </div>
+
+        {/* Hover reveal: Quick description */}
+        {description && (
+          <div className="px-5 pb-4 pt-0">
+            <p className="text-sm text-warm-500 line-clamp-2">
+              {description}
+            </p>
+          </div>
+        )}
       </Card>
     </motion.div>
   )
