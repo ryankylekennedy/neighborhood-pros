@@ -38,8 +38,10 @@ export function useProfessionals({
         query = query.eq('category_id', categoryId)
       }
 
+      // Enhanced search: name, description, and services
       if (searchQuery.trim()) {
-        query = query.or(`name.ilike.%${searchQuery}%`)
+        const search = searchQuery.trim().toLowerCase()
+        query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%,services.ilike.%${search}%`)
       }
 
       const { data, error: fetchError } = await query
