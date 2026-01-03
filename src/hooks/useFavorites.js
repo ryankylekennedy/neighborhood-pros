@@ -1,57 +1,60 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from './useAuth'
 
 export function useFavorites() {
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const [favorites, setFavorites] = useState([])
   const [favoriteIds, setFavoriteIds] = useState(new Set())
-  const [loading, setLoading] = useState(true)
-  const initialLoadDone = useRef(false)
-
-  const fetchFavorites = useCallback(async (showLoading = true) => {
-    if (!user) {
-      setFavorites([])
-      setFavoriteIds(new Set())
-      setLoading(false)
-      return
-    }
-
-    try {
-      if (showLoading && !initialLoadDone.current) {
-        setLoading(true)
-      }
-      
-      const { data, error } = await supabase
-        .from('favorites')
-        .select(`
-          *,
-          professional:professionals(
-            *,
-            category:categories(*),
-            subcategories:professional_subcategories(
-              subcategory:subcategories(*)
-            )
-          )
-        `)
-        .eq('user_id', user.id)
-
-      if (error) throw error
-
-      setFavorites(data || [])
-      setFavoriteIds(new Set(data?.map(f => f.professional_id) || []))
-      initialLoadDone.current = true
-    } catch (error) {
-      console.error('Error fetching favorites:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [user])
+  const [loading, setLoading] = useState(false)
+  const fetchedForUser = useRef(null)
 
   useEffect(() => {
-    initialLoadDone.current = false
+    // Don't fetch while auth is still loading
+    if (authLoading) return
+
+    // Don't refetch for the same user
+    if (fetchedForUser.current === (user?.id || 'none')) return
+
+    const fetchFavorites = async () => {
+      if (!user) {
+        setFavorites([])
+        setFavoriteIds(new Set())
+        fetchedForUser.current = 'none'
+        return
+      }
+
+      try {
+        setLoading(true)
+        
+        const { data, error } = await supabase
+          .from('favorites')
+          .select(`
+            *,
+            professional:professionals(
+              *,
+              category:categories(*),
+              subcategories:professional_subcategories(
+                subcategory:subcategories(*)
+              )
+            )
+          `)
+          .eq('user_id', user.id)
+
+        if (error) throw error
+
+        setFavorites(data || [])
+        setFavoriteIds(new Set(data?.map(f => f.professional_id) || []))
+        fetchedForUser.current = user.id
+      } catch (error) {
+        console.error('Error fetching favorites:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
     fetchFavorites()
-  }, [user])
+  }, [user?.id, authLoading])
 
   const addFavorite = async (professionalId) => {
     if (!user) return { error: { message: 'Must be logged in to favorite' } }
@@ -76,8 +79,6 @@ export function useFavorites() {
         throw error
       }
 
-      // Background refresh without loading state
-      fetchFavorites(false)
       return { data }
     } catch (error) {
       return { error }
@@ -88,6 +89,7 @@ export function useFavorites() {
     if (!user) return { error: { message: 'Must be logged in' } }
 
     // Optimistic update
+    const previousIds = new Set(favoriteIds)
     setFavoriteIds(prev => {
       const next = new Set(prev)
       next.delete(professionalId)
@@ -103,12 +105,10 @@ export function useFavorites() {
 
       if (error) {
         // Revert on error
-        setFavoriteIds(prev => new Set([...prev, professionalId]))
+        setFavoriteIds(previousIds)
         throw error
       }
 
-      // Background refresh without loading state
-      fetchFavorites(false)
       return { success: true }
     } catch (error) {
       return { error }
@@ -133,6 +133,6 @@ export function useFavorites() {
     removeFavorite,
     toggleFavorite,
     isFavorite,
-    refresh: fetchFavorites
+    refresh: () => { fetchedForUser.current = null }
   }
 }
