@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 
 export function useProfessionals({ 
@@ -12,12 +12,79 @@ export function useProfessionals({
   const [error, setError] = useState(null)
   const [hasMore, setHasMore] = useState(true)
   const [page, setPage] = useState(0)
+  const isFirstLoad = useRef(true)
 
-  const fetchProfessionals = useCallback(async (pageNum = 0, append = false) => {
+  useEffect(() => {
+    const fetchProfessionals = async () => {
+      try {
+        if (isFirstLoad.current) {
+          setLoading(true)
+        }
+        setError(null)
+
+        let query = supabase
+          .from('professionals')
+          .select(`
+            *,
+            category:categories(*),
+            subcategories:professional_subcategories(
+              subcategory:subcategories(*)
+            ),
+            preferred_neighborhoods:professional_neighborhoods(
+              neighborhood:neighborhoods(*)
+            ),
+            recommendations(count)
+          `)
+          .range(0, limit - 1)
+          .order('name')
+
+        if (categoryId) {
+          query = query.eq('category_id', categoryId)
+        }
+
+        if (searchQuery.trim()) {
+          const search = searchQuery.trim()
+          query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%,services.ilike.%${search}%`)
+        }
+
+        const { data, error: fetchError } = await query
+
+        if (fetchError) throw fetchError
+
+        let sortedData = data || []
+        if (userNeighborhoodId) {
+          sortedData = [...sortedData].sort((a, b) => {
+            const aIsPreferred = a.preferred_neighborhoods?.some(
+              pn => pn.neighborhood?.id === userNeighborhoodId
+            )
+            const bIsPreferred = b.preferred_neighborhoods?.some(
+              pn => pn.neighborhood?.id === userNeighborhoodId
+            )
+            if (aIsPreferred && !bIsPreferred) return -1
+            if (!aIsPreferred && bIsPreferred) return 1
+            return 0
+          })
+        }
+
+        setProfessionals(sortedData)
+        setHasMore(data?.length === limit)
+        setPage(0)
+        isFirstLoad.current = false
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProfessionals()
+  }, [categoryId, searchQuery, userNeighborhoodId, limit])
+
+  const loadMore = async () => {
+    if (loading || !hasMore) return
+
+    const nextPage = page + 1
     try {
-      setLoading(true)
-      setError(null)
-
       let query = supabase
         .from('professionals')
         .select(`
@@ -31,16 +98,15 @@ export function useProfessionals({
           ),
           recommendations(count)
         `)
-        .range(pageNum * limit, (pageNum + 1) * limit - 1)
+        .range(nextPage * limit, (nextPage + 1) * limit - 1)
         .order('name')
 
       if (categoryId) {
         query = query.eq('category_id', categoryId)
       }
 
-      // Enhanced search: name, description, and services
       if (searchQuery.trim()) {
-        const search = searchQuery.trim().toLowerCase()
+        const search = searchQuery.trim()
         query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%,services.ilike.%${search}%`)
       }
 
@@ -48,49 +114,17 @@ export function useProfessionals({
 
       if (fetchError) throw fetchError
 
-      // Sort by preferred neighborhood status
-      let sortedData = data || []
-      if (userNeighborhoodId) {
-        sortedData = [...sortedData].sort((a, b) => {
-          const aIsPreferred = a.preferred_neighborhoods?.some(
-            pn => pn.neighborhood?.id === userNeighborhoodId
-          )
-          const bIsPreferred = b.preferred_neighborhoods?.some(
-            pn => pn.neighborhood?.id === userNeighborhoodId
-          )
-          if (aIsPreferred && !bIsPreferred) return -1
-          if (!aIsPreferred && bIsPreferred) return 1
-          return 0
-        })
-      }
-
-      if (append) {
-        setProfessionals(prev => [...prev, ...sortedData])
-      } else {
-        setProfessionals(sortedData)
-      }
-
+      setProfessionals(prev => [...prev, ...(data || [])])
       setHasMore(data?.length === limit)
-      setPage(pageNum)
+      setPage(nextPage)
     } catch (err) {
       setError(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }, [categoryId, searchQuery, userNeighborhoodId, limit])
-
-  useEffect(() => {
-    fetchProfessionals(0, false)
-  }, [fetchProfessionals])
-
-  const loadMore = () => {
-    if (!loading && hasMore) {
-      fetchProfessionals(page + 1, true)
     }
   }
 
   const refresh = () => {
-    fetchProfessionals(0, false)
+    isFirstLoad.current = true
+    setPage(0)
   }
 
   return {
