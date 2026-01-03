@@ -27,17 +27,31 @@ export function HomePage() {
   const [selectedCategoryId, setSelectedCategoryId] = useState(null)
   const [recommendDialog, setRecommendDialog] = useState({ open: false, professional: null })
 
-  const userNeighborhoodId = profile?.neighborhood_id || null
-
   const { professionals, loading, hasMore, loadMore } = useProfessionals({
     categoryId: selectedCategoryId,
     searchQuery,
-    userNeighborhoodId,
     limit: 12
   })
 
   const { categories } = useCategories()
   const { isFavorite, toggleFavorite } = useFavorites()
+
+  // Sort preferred partners client-side
+  const userNeighborhoodId = profile?.neighborhood_id || null
+  const sortedProfessionals = useMemo(() => {
+    if (!userNeighborhoodId) return professionals
+    return [...professionals].sort((a, b) => {
+      const aIsPreferred = a.preferred_neighborhoods?.some(
+        pn => pn.neighborhood?.id === userNeighborhoodId
+      )
+      const bIsPreferred = b.preferred_neighborhoods?.some(
+        pn => pn.neighborhood?.id === userNeighborhoodId
+      )
+      if (aIsPreferred && !bIsPreferred) return -1
+      if (!aIsPreferred && bIsPreferred) return 1
+      return 0
+    })
+  }, [professionals, userNeighborhoodId])
 
   // Build search suggestions
   const suggestions = useMemo(() => {
@@ -51,7 +65,7 @@ export function HomePage() {
       }
     })
 
-    professionals.forEach(pro => {
+    sortedProfessionals.forEach(pro => {
       if (pro.name && !seen.has(pro.name.toLowerCase())) {
         suggestionList.push({ label: pro.name, type: 'Professional', id: pro.id })
         seen.add(pro.name.toLowerCase())
@@ -66,7 +80,7 @@ export function HomePage() {
     })
 
     return suggestionList
-  }, [categories, professionals])
+  }, [categories, sortedProfessionals])
 
   const isPreferredPartner = (professional) => {
     if (!userNeighborhoodId) return false
@@ -214,7 +228,7 @@ export function HomePage() {
           )}
 
           {/* Loading State */}
-          {loading && professionals.length === 0 && (
+          {loading && sortedProfessionals.length === 0 && (
             <div className="flex items-center justify-center min-h-[400px]">
               <div className="flex flex-col items-center gap-4">
                 <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -224,7 +238,7 @@ export function HomePage() {
           )}
 
           {/* Empty State */}
-          {!loading && professionals.length === 0 && (
+          {!loading && sortedProfessionals.length === 0 && (
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -245,9 +259,9 @@ export function HomePage() {
           )}
 
           {/* Professional Cards Grid */}
-          {professionals.length > 0 && (
+          {sortedProfessionals.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {professionals.map((professional, index) => (
+              {sortedProfessionals.map((professional, index) => (
                 <ProfessionalCard
                   key={professional.id}
                   professional={professional}
@@ -262,7 +276,7 @@ export function HomePage() {
           )}
 
           {/* Load More Button */}
-          {hasMore && professionals.length > 0 && (
+          {hasMore && sortedProfessionals.length > 0 && (
             <div className="flex justify-center pt-4">
               <Button
                 onClick={loadMore}
