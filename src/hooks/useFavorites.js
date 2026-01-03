@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from './useAuth'
 
@@ -7,8 +7,9 @@ export function useFavorites() {
   const [favorites, setFavorites] = useState([])
   const [favoriteIds, setFavoriteIds] = useState(new Set())
   const [loading, setLoading] = useState(true)
+  const initialLoadDone = useRef(false)
 
-  const fetchFavorites = useCallback(async () => {
+  const fetchFavorites = useCallback(async (showLoading = true) => {
     if (!user) {
       setFavorites([])
       setFavoriteIds(new Set())
@@ -17,7 +18,10 @@ export function useFavorites() {
     }
 
     try {
-      setLoading(true)
+      if (showLoading && !initialLoadDone.current) {
+        setLoading(true)
+      }
+      
       const { data, error } = await supabase
         .from('favorites')
         .select(`
@@ -36,6 +40,7 @@ export function useFavorites() {
 
       setFavorites(data || [])
       setFavoriteIds(new Set(data?.map(f => f.professional_id) || []))
+      initialLoadDone.current = true
     } catch (error) {
       console.error('Error fetching favorites:', error)
     } finally {
@@ -44,11 +49,15 @@ export function useFavorites() {
   }, [user])
 
   useEffect(() => {
+    initialLoadDone.current = false
     fetchFavorites()
-  }, [fetchFavorites])
+  }, [user])
 
   const addFavorite = async (professionalId) => {
     if (!user) return { error: { message: 'Must be logged in to favorite' } }
+
+    // Optimistic update
+    setFavoriteIds(prev => new Set([...prev, professionalId]))
 
     try {
       const { data, error } = await supabase
@@ -57,10 +66,18 @@ export function useFavorites() {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        // Revert on error
+        setFavoriteIds(prev => {
+          const next = new Set(prev)
+          next.delete(professionalId)
+          return next
+        })
+        throw error
+      }
 
-      setFavoriteIds(prev => new Set([...prev, professionalId]))
-      await fetchFavorites()
+      // Background refresh without loading state
+      fetchFavorites(false)
       return { data }
     } catch (error) {
       return { error }
@@ -70,6 +87,13 @@ export function useFavorites() {
   const removeFavorite = async (professionalId) => {
     if (!user) return { error: { message: 'Must be logged in' } }
 
+    // Optimistic update
+    setFavoriteIds(prev => {
+      const next = new Set(prev)
+      next.delete(professionalId)
+      return next
+    })
+
     try {
       const { error } = await supabase
         .from('favorites')
@@ -77,14 +101,14 @@ export function useFavorites() {
         .eq('user_id', user.id)
         .eq('professional_id', professionalId)
 
-      if (error) throw error
+      if (error) {
+        // Revert on error
+        setFavoriteIds(prev => new Set([...prev, professionalId]))
+        throw error
+      }
 
-      setFavoriteIds(prev => {
-        const next = new Set(prev)
-        next.delete(professionalId)
-        return next
-      })
-      await fetchFavorites()
+      // Background refresh without loading state
+      fetchFavorites(false)
       return { success: true }
     } catch (error) {
       return { error }
