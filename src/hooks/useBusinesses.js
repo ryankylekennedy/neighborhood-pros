@@ -10,7 +10,6 @@ export function useBusinesses({ subcategoryId = null, serviceId = null, searchQu
 
   useEffect(() => {
     setOffset(0)
-    setBusinesses([])
     fetchBusinesses(0, true)
   }, [subcategoryId, serviceId, searchQuery])
 
@@ -19,11 +18,33 @@ export function useBusinesses({ subcategoryId = null, serviceId = null, searchQu
       setLoading(true)
       setError(null)
 
+      // First get the businesses
       let query = supabase
         .from('businesses')
-        .select(`
-          *,
-          business_services (
+        .select('*')
+        .eq('status', 'approved')
+        .order('created_at', { ascending: false })
+        .range(newOffset, newOffset + limit - 1)
+
+      // Search by name or description
+      if (searchQuery.trim()) {
+        query = query.or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`)
+      }
+
+      const { data: businessData, error: fetchError } = await query
+
+      if (fetchError) throw fetchError
+
+      // Now get the services for each business
+      const businessIds = businessData?.map(b => b.id) || []
+      
+      let businessesWithServices = businessData || []
+
+      if (businessIds.length > 0) {
+        const { data: servicesData } = await supabase
+          .from('business_services')
+          .select(`
+            business_id,
             service:services (
               id,
               name,
@@ -37,73 +58,37 @@ export function useBusinesses({ subcategoryId = null, serviceId = null, searchQu
                 )
               )
             )
-          )
-        `)
-        .eq('status', 'approved')
-        .order('created_at', { ascending: false })
-        .range(newOffset, newOffset + limit - 1)
+          `)
+          .in('business_id', businessIds)
 
-      // Filter by service
+        // Merge services into businesses
+        businessesWithServices = businessData.map(business => ({
+          ...business,
+          business_services: servicesData?.filter(s => s.business_id === business.id) || []
+        }))
+      }
+
+      // Filter by subcategory if needed
+      if (subcategoryId) {
+        businessesWithServices = businessesWithServices.filter(b => 
+          b.business_services?.some(bs => bs.service?.subcategory?.id === subcategoryId)
+        )
+      }
+
+      // Filter by service if needed
       if (serviceId) {
-        const { data: businessIds } = await supabase
-          .from('business_services')
-          .select('business_id')
-          .eq('service_id', serviceId)
-        
-        const ids = businessIds?.map(b => b.business_id) || []
-        if (ids.length > 0) {
-          query = query.in('id', ids)
-        } else {
-          setBusinesses([])
-          setLoading(false)
-          setHasMore(false)
-          return
-        }
+        businessesWithServices = businessesWithServices.filter(b => 
+          b.business_services?.some(bs => bs.service?.id === serviceId)
+        )
       }
-
-      // Filter by subcategory
-      if (subcategoryId && !serviceId) {
-        const { data: serviceIds } = await supabase
-          .from('services')
-          .select('id')
-          .eq('subcategory_id', subcategoryId)
-        
-        const sIds = serviceIds?.map(s => s.id) || []
-        
-        if (sIds.length > 0) {
-          const { data: businessIds } = await supabase
-            .from('business_services')
-            .select('business_id')
-            .in('service_id', sIds)
-          
-          const ids = [...new Set(businessIds?.map(b => b.business_id) || [])]
-          if (ids.length > 0) {
-            query = query.in('id', ids)
-          } else {
-            setBusinesses([])
-            setLoading(false)
-            setHasMore(false)
-            return
-          }
-        }
-      }
-
-      // Search by name or description
-      if (searchQuery.trim()) {
-        query = query.or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`)
-      }
-
-      const { data, error: fetchError } = await query
-
-      if (fetchError) throw fetchError
 
       if (reset) {
-        setBusinesses(data || [])
+        setBusinesses(businessesWithServices)
       } else {
-        setBusinesses(prev => [...prev, ...(data || [])])
+        setBusinesses(prev => [...prev, ...businessesWithServices])
       }
 
-      setHasMore((data?.length || 0) === limit)
+      setHasMore((businessData?.length || 0) === limit)
       setOffset(newOffset + limit)
     } catch (err) {
       console.error('Error fetching businesses:', err)
