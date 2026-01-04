@@ -159,7 +159,7 @@ export function HomePage() {
     }
   }, [isSearchFocused])
 
-  const isFilterActive = searchQuery.trim() !== '' || selectedCategoryId !== null || selectedServiceId !== null
+  const isFilterActive = searchQuery.trim() !== '' || selectedCategoryId !== null || selectedSubcategoryId !== null || selectedServiceId !== null
 
   return (
     <div className="min-h-screen">
@@ -424,11 +424,16 @@ export function HomePage() {
                   Service: {selectedService.name}
                 </Badge>
               )}
-              {selectedCategory && (
-                <Badge variant="outline">{selectedCategory.emoji} {selectedCategory.name}</Badge>
+              {selectedSubcategory && !selectedService && (
+                <Badge variant="outline" className="bg-primary/10">
+                  {selectedSubcategory.category?.emoji && (
+                    <span className="mr-1">{selectedSubcategory.category.emoji}</span>
+                  )}
+                  {selectedSubcategory.name}
+                </Badge>
               )}
-              {selectedSubcategory && (
-                <Badge variant="outline">{selectedSubcategory.name}</Badge>
+              {selectedCategory && !selectedSubcategory && (
+                <Badge variant="outline">{selectedCategory.emoji} {selectedCategory.name}</Badge>
               )}
             </div>
           )}
