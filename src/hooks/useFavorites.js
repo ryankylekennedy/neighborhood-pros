@@ -1,138 +1,154 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useAuth } from './useAuth'
+import { useAuth } from '@/hooks/useAuth'
 
 export function useFavorites() {
   const { user, loading: authLoading } = useAuth()
   const [favorites, setFavorites] = useState([])
-  const [favoriteIds, setFavoriteIds] = useState(new Set())
   const [loading, setLoading] = useState(false)
   const fetchedForUser = useRef(null)
 
   useEffect(() => {
-    // Don't fetch while auth is still loading
     if (authLoading) return
-
-    // Don't refetch for the same user
-    if (fetchedForUser.current === (user?.id || 'none')) return
-
-    const fetchFavorites = async () => {
-      if (!user) {
-        setFavorites([])
-        setFavoriteIds(new Set())
-        fetchedForUser.current = 'none'
-        return
-      }
-
-      try {
-        setLoading(true)
-        
-        const { data, error } = await supabase
-          .from('favorites')
-          .select(`
-            *,
-            professional:professionals(
-              *,
-              category:categories(*),
-              subcategories:professional_subcategories(
-                subcategory:subcategories(*)
-              )
-            )
-          `)
-          .eq('user_id', user.id)
-
-        if (error) throw error
-
-        setFavorites(data || [])
-        setFavoriteIds(new Set(data?.map(f => f.professional_id) || []))
-        fetchedForUser.current = user.id
-      } catch (error) {
-        console.error('Error fetching favorites:', error)
-      } finally {
-        setLoading(false)
-      }
+    
+    if (!user) {
+      setFavorites([])
+      fetchedForUser.current = null
+      return
     }
 
+    if (fetchedForUser.current === user.id) return
+
     fetchFavorites()
-  }, [user?.id, authLoading])
+  }, [user, authLoading])
 
-  const addFavorite = async (professionalId) => {
-    if (!user) return { error: { message: 'Must be logged in to favorite' } }
-
-    // Optimistic update
-    setFavoriteIds(prev => new Set([...prev, professionalId]))
+  async function fetchFavorites() {
+    if (!user) return
 
     try {
+      setLoading(true)
+      fetchedForUser.current = user.id
+
       const { data, error } = await supabase
         .from('favorites')
-        .insert({ user_id: user.id, professional_id: professionalId })
-        .select()
+        .select(`
+          id,
+          business_id,
+          business:businesses (
+            id,
+            name,
+            description,
+            phone,
+            email,
+            website,
+            business_services (
+              service:services (
+                id,
+                name,
+                subcategory:subcategories (
+                  id,
+                  name,
+                  category:categories (
+                    id,
+                    name,
+                    emoji
+                  )
+                )
+              )
+            )
+          )
+        `)
+        .eq('user_id', user.id)
+
+      if (error) throw error
+      setFavorites(data || [])
+    } catch (err) {
+      console.error('Error fetching favorites:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const isFavorite = useCallback((businessId) => {
+    return favorites.some(f => f.business_id === businessId)
+  }, [favorites])
+
+  async function toggleFavorite(businessId) {
+    if (!user) return
+
+    const existing = favorites.find(f => f.business_id === businessId)
+
+    if (existing) {
+      // Optimistic update - remove
+      setFavorites(prev => prev.filter(f => f.business_id !== businessId))
+
+      const { error } = await supabase
+        .from('favorites')
+        .delete()
+        .eq('id', existing.id)
+
+      if (error) {
+        // Revert on error
+        setFavorites(prev => [...prev, existing])
+        console.error('Error removing favorite:', error)
+      }
+    } else {
+      // Optimistic update - add
+      const tempFavorite = { 
+        id: 'temp-' + Date.now(), 
+        business_id: businessId,
+        business: null 
+      }
+      setFavorites(prev => [...prev, tempFavorite])
+
+      const { data, error } = await supabase
+        .from('favorites')
+        .insert({ user_id: user.id, business_id: businessId })
+        .select(`
+          id,
+          business_id,
+          business:businesses (
+            id,
+            name,
+            description,
+            phone,
+            email,
+            website,
+            business_services (
+              service:services (
+                id,
+                name,
+                subcategory:subcategories (
+                  id,
+                  name,
+                  category:categories (
+                    id,
+                    name,
+                    emoji
+                  )
+                )
+              )
+            )
+          )
+        `)
         .single()
 
       if (error) {
         // Revert on error
-        setFavoriteIds(prev => {
-          const next = new Set(prev)
-          next.delete(professionalId)
-          return next
-        })
-        throw error
+        setFavorites(prev => prev.filter(f => f.id !== tempFavorite.id))
+        console.error('Error adding favorite:', error)
+      } else {
+        // Replace temp with real data
+        setFavorites(prev => prev.map(f => f.id === tempFavorite.id ? data : f))
       }
-
-      return { data }
-    } catch (error) {
-      return { error }
     }
   }
 
-  const removeFavorite = async (professionalId) => {
-    if (!user) return { error: { message: 'Must be logged in' } }
-
-    // Optimistic update
-    const previousIds = new Set(favoriteIds)
-    setFavoriteIds(prev => {
-      const next = new Set(prev)
-      next.delete(professionalId)
-      return next
-    })
-
-    try {
-      const { error } = await supabase
-        .from('favorites')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('professional_id', professionalId)
-
-      if (error) {
-        // Revert on error
-        setFavoriteIds(previousIds)
-        throw error
-      }
-
-      return { success: true }
-    } catch (error) {
-      return { error }
-    }
-  }
-
-  const toggleFavorite = async (professionalId) => {
-    if (favoriteIds.has(professionalId)) {
-      return removeFavorite(professionalId)
-    } else {
-      return addFavorite(professionalId)
-    }
-  }
-
-  const isFavorite = (professionalId) => favoriteIds.has(professionalId)
-
-  return {
-    favorites,
-    favoriteIds,
-    loading,
-    addFavorite,
-    removeFavorite,
+  return { 
+    favorites, 
+    loading, 
+    isFavorite, 
     toggleFavorite,
-    isFavorite,
-    refresh: () => { fetchedForUser.current = null }
+    refetch: fetchFavorites
   }
 }

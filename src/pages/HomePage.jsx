@@ -1,244 +1,207 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Bookmark, Heart, Search, X } from 'lucide-react'
+import { Bookmark, Search, X, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ProfessionalCard } from '@/components/ProfessionalCard'
-import { SearchBar } from '@/components/SearchBar'
-import { CategoryFilter } from '@/components/CategoryFilter'
-import { useProfessionals, useCategories } from '@/hooks/useProfessionals'
+import { BusinessCard } from '@/components/BusinessCard'
+import { useBusinesses, useCategories, useSubcategories } from '@/hooks/useBusinesses'
 import { useFavorites } from '@/hooks/useFavorites'
 import { useAuth } from '@/hooks/useAuth'
 import { toast } from '@/hooks/useToast'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 export function HomePage() {
   const navigate = useNavigate()
-  const { user, profile } = useAuth()
+  const { user } = useAuth()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState(null)
-  const [recommendDialog, setRecommendDialog] = useState({ open: false, professional: null })
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState(null)
 
-  const { professionals, loading, hasMore, loadMore } = useProfessionals({
-    categoryId: selectedCategoryId,
+  const { businesses, loading, hasMore, loadMore } = useBusinesses({
+    subcategoryId: selectedSubcategoryId,
     searchQuery,
     limit: 12
   })
 
   const { categories } = useCategories()
+  const { subcategories } = useSubcategories(selectedCategoryId)
   const { isFavorite, toggleFavorite } = useFavorites()
 
-  // Sort preferred partners client-side
-  const userNeighborhoodId = profile?.neighborhood_id || null
-  const sortedProfessionals = useMemo(() => {
-    if (!userNeighborhoodId) return professionals
-    return [...professionals].sort((a, b) => {
-      const aIsPreferred = a.preferred_neighborhoods?.some(
-        pn => pn.neighborhood?.id === userNeighborhoodId
-      )
-      const bIsPreferred = b.preferred_neighborhoods?.some(
-        pn => pn.neighborhood?.id === userNeighborhoodId
-      )
-      if (aIsPreferred && !bIsPreferred) return -1
-      if (!aIsPreferred && bIsPreferred) return 1
-      return 0
-    })
-  }, [professionals, userNeighborhoodId])
+  const selectedCategory = categories.find(c => c.id === selectedCategoryId)
+  const selectedSubcategory = subcategories.find(s => s.id === selectedSubcategoryId)
 
-  // Build search suggestions
-  const suggestions = useMemo(() => {
-    const suggestionList = []
-    const seen = new Set()
-
-    categories.forEach(cat => {
-      if (!seen.has(cat.name.toLowerCase())) {
-        suggestionList.push({ label: cat.name, type: 'Category', id: cat.id })
-        seen.add(cat.name.toLowerCase())
-      }
-    })
-
-    sortedProfessionals.forEach(pro => {
-      if (pro.name && !seen.has(pro.name.toLowerCase())) {
-        suggestionList.push({ label: pro.name, type: 'Professional', id: pro.id })
-        seen.add(pro.name.toLowerCase())
-      }
-      pro.subcategories?.forEach(ps => {
-        const name = ps.subcategory?.name
-        if (name && !seen.has(name.toLowerCase())) {
-          suggestionList.push({ label: name, type: 'Service' })
-          seen.add(name.toLowerCase())
-        }
-      })
-    })
-
-    return suggestionList
-  }, [categories, sortedProfessionals])
-
-  const isPreferredPartner = (professional) => {
-    if (!userNeighborhoodId) return false
-    return professional.preferred_neighborhoods?.some(
-      pn => pn.neighborhood?.id === userNeighborhoodId
-    )
-  }
-
-  const handleFavoriteClick = async (professional) => {
+  const handleFavoriteClick = async (business) => {
     if (!user) {
       toast({
         title: "Sign in required",
-        description: "Please sign in to save favorites and recommend professionals.",
+        description: "Please sign in to save favorites.",
         variant: "destructive"
       })
       return
     }
-
-    const currentlyFavorited = isFavorite(professional.id)
-    
-    if (!currentlyFavorited) {
-      setRecommendDialog({ open: true, professional })
-    } else {
-      await toggleFavorite(professional.id)
-      toast({
-        title: "Removed from favorites",
-        description: `${professional.name} has been removed from your favorites.`
-      })
-    }
+    await toggleFavorite(business.id)
   }
 
-  const handleRecommendResponse = async (shouldRecommend) => {
-    const { professional } = recommendDialog
-    
-    await toggleFavorite(professional.id)
-    
-    if (shouldRecommend) {
-      navigate(`/professional/${professional.id}?recommend=true`)
-    } else {
-      toast({
-        title: "Added to favorites",
-        description: `${professional.name} has been saved to your favorites.`,
-        variant: "success"
-      })
-    }
-    
-    setRecommendDialog({ open: false, professional: null })
+  const handleCardClick = (business) => {
+    navigate(`/business/${business.id}`)
   }
 
-  const handleCardClick = (professional) => {
-    navigate(`/professional/${professional.id}`)
+  const handleCategorySelect = (categoryId) => {
+    setSelectedCategoryId(categoryId)
+    setSelectedSubcategoryId(null)
   }
 
-  const handleSuggestionSelect = (suggestion) => {
-    if (suggestion.type === 'Category') {
-      setSelectedCategoryId(suggestion.id)
-      setSearchQuery('')
-    } else {
-      setSearchQuery(suggestion.label)
-    }
+  const handleSubcategorySelect = (subcategoryId) => {
+    setSelectedSubcategoryId(subcategoryId)
   }
 
-  const isSearchActive = searchQuery.trim() !== '' || selectedCategoryId !== null
-
-  const clearSearch = () => {
+  const clearFilters = () => {
     setSearchQuery('')
     setSelectedCategoryId(null)
+    setSelectedSubcategoryId(null)
   }
 
-  const pageTitle = profile?.neighborhood?.name 
-    ? `${profile.neighborhood.name} Professionals`
-    : 'Local Professionals'
+  const isFilterActive = searchQuery.trim() !== '' || selectedCategoryId !== null
 
   return (
     <div className="min-h-screen">
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col gap-6">
-          {/* Header Section */}
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <motion.h1 
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-3xl md:text-4xl font-display font-bold text-foreground"
+          
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <motion.h1 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-3xl md:text-4xl font-display font-bold text-foreground"
+            >
+              Local Businesses
+            </motion.h1>
+            
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={() => navigate('/favorites')}
+                className="gap-2"
               >
-                {pageTitle}
-              </motion.h1>
-              
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => navigate('/favorites')}
-                  className="gap-2"
-                >
-                  <Bookmark size={18} />
-                  <span className="hidden sm:inline">My Favorites</span>
-                </Button>
-                
-                <SearchBar
-                  value={searchQuery}
-                  onChange={setSearchQuery}
-                  suggestions={suggestions}
-                  onSuggestionSelect={handleSuggestionSelect}
-                  placeholder="Search by name or service..."
-                />
-              </div>
+                <Bookmark size={18} />
+                <span className="hidden sm:inline">My Favorites</span>
+              </Button>
             </div>
+          </div>
 
-            {isSearchActive && (
-              <motion.div 
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-2"
-              >
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={clearSearch}
-                  className="gap-2"
-                >
-                  <X size={16} />
-                  Clear filters
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
+            <input
+              type="text"
+              placeholder="Search businesses..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+
+          {/* Category & Subcategory Filters */}
+          <div className="flex flex-wrap gap-3">
+            {/* Category Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  {selectedCategory ? (
+                    <>
+                      <span>{selectedCategory.emoji}</span>
+                      <span>{selectedCategory.name}</span>
+                    </>
+                  ) : (
+                    'All Categories'
+                  )}
+                  <ChevronDown size={16} />
                 </Button>
-                {searchQuery.trim() && (
-                  <Badge variant="outline">
-                    Search: {searchQuery}
-                  </Badge>
-                )}
-                {selectedCategoryId && (
-                  <Badge variant="outline">
-                    Category: {categories.find(c => c.id === selectedCategoryId)?.name}
-                  </Badge>
-                )}
-              </motion.div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="max-h-64 overflow-y-auto">
+                <DropdownMenuItem onClick={() => handleCategorySelect(null)}>
+                  All Categories
+                </DropdownMenuItem>
+                {categories.map((category) => (
+                  <DropdownMenuItem 
+                    key={category.id} 
+                    onClick={() => handleCategorySelect(category.id)}
+                  >
+                    <span className="mr-2">{category.emoji}</span>
+                    {category.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Subcategory Dropdown (only show when category is selected) */}
+            {selectedCategoryId && subcategories.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    {selectedSubcategory ? selectedSubcategory.name : 'All Subcategories'}
+                    <ChevronDown size={16} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="max-h-64 overflow-y-auto">
+                  <DropdownMenuItem onClick={() => handleSubcategorySelect(null)}>
+                    All Subcategories
+                  </DropdownMenuItem>
+                  {subcategories.map((sub) => (
+                    <DropdownMenuItem 
+                      key={sub.id} 
+                      onClick={() => handleSubcategorySelect(sub.id)}
+                    >
+                      {sub.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            {/* Clear Filters */}
+            {isFilterActive && (
+              <Button variant="ghost" onClick={clearFilters} className="gap-2">
+                <X size={16} />
+                Clear filters
+              </Button>
             )}
           </div>
 
-          {/* Category Filter */}
-          {categories.length > 0 && (
-            <CategoryFilter
-              categories={categories}
-              selectedId={selectedCategoryId}
-              onSelect={setSelectedCategoryId}
-            />
+          {/* Active Filters Display */}
+          {isFilterActive && (
+            <div className="flex flex-wrap gap-2">
+              {searchQuery.trim() && (
+                <Badge variant="outline">Search: {searchQuery}</Badge>
+              )}
+              {selectedCategory && (
+                <Badge variant="outline">{selectedCategory.emoji} {selectedCategory.name}</Badge>
+              )}
+              {selectedSubcategory && (
+                <Badge variant="outline">{selectedSubcategory.name}</Badge>
+              )}
+            </div>
           )}
 
           {/* Loading State */}
-          {loading && sortedProfessionals.length === 0 && (
+          {loading && businesses.length === 0 && (
             <div className="flex items-center justify-center min-h-[400px]">
               <div className="flex flex-col items-center gap-4">
                 <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                <p className="text-muted-foreground">Loading professionals...</p>
+                <p className="text-muted-foreground">Loading businesses...</p>
               </div>
             </div>
           )}
 
           {/* Empty State */}
-          {!loading && sortedProfessionals.length === 0 && (
+          {!loading && businesses.length === 0 && (
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -248,25 +211,24 @@ export function HomePage() {
                 <Search size={32} className="text-muted-foreground" />
               </div>
               <h3 className="text-xl font-semibold text-foreground mb-2">
-                No professionals found
+                No businesses found
               </h3>
               <p className="text-muted-foreground max-w-md">
-                {isSearchActive 
+                {isFilterActive 
                   ? "Try adjusting your search or clearing filters."
-                  : "Check back soon for local professionals in your area."}
+                  : "Check back soon for local businesses in your area."}
               </p>
             </motion.div>
           )}
 
-          {/* Professional Cards Grid */}
-          {sortedProfessionals.length > 0 && (
+          {/* Business Cards Grid */}
+          {businesses.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {sortedProfessionals.map((professional, index) => (
-                <ProfessionalCard
-                  key={professional.id}
-                  professional={professional}
-                  isFavorite={isFavorite(professional.id)}
-                  isPreferred={isPreferredPartner(professional)}
+              {businesses.map((business, index) => (
+                <BusinessCard
+                  key={business.id}
+                  business={business}
+                  isFavorite={isFavorite(business.id)}
                   onFavoriteClick={handleFavoriteClick}
                   onClick={handleCardClick}
                   animationDelay={index * 0.05}
@@ -276,7 +238,7 @@ export function HomePage() {
           )}
 
           {/* Load More Button */}
-          {hasMore && sortedProfessionals.length > 0 && (
+          {hasMore && businesses.length > 0 && (
             <div className="flex justify-center pt-4">
               <Button
                 onClick={loadMore}
@@ -290,29 +252,6 @@ export function HomePage() {
           )}
         </div>
       </div>
-
-      {/* Recommend Dialog */}
-      <Dialog 
-        open={recommendDialog.open} 
-        onOpenChange={(open) => !open && setRecommendDialog({ open: false, professional: null })}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Recommend to Neighbors?</DialogTitle>
-            <DialogDescription>
-              Would you like to recommend {recommendDialog.professional?.name} to your neighbors?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex flex-col sm:flex-row gap-2">
-            <Button onClick={() => handleRecommendResponse(true)}>
-              Yes, Recommend
-            </Button>
-            <Button variant="outline" onClick={() => handleRecommendResponse(false)}>
-              No, Just Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
