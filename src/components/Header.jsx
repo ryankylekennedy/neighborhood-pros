@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Menu, X, User, LogOut, Settings, Heart } from 'lucide-react'
+import { Menu, X, User, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -79,29 +79,23 @@ export function Header() {
             {/* Logo */}
             <Link to="/" className="flex items-center gap-2">
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <span className="text-white font-bold text-lg">N</span>
+                <span className="text-white font-bold text-lg">
+                  {profile?.neighborhood?.name?.[0]?.toUpperCase() || 'N'}
+                </span>
               </div>
               <span className="font-display font-semibold text-xl hidden sm:block">
-                Neighborhood Pros
+                {profile?.neighborhood?.name ? `${profile.neighborhood.name} Collective` : 'Neighborhood Collective'}
               </span>
             </Link>
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-6">
-              <Link 
-                to="/" 
+              <Link
+                to="/"
                 className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
               >
                 Browse
               </Link>
-              {user && (
-                <Link 
-                  to="/favorites" 
-                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  My Favorites
-                </Link>
-              )}
             </nav>
 
             {/* Auth Buttons */}
@@ -167,23 +161,13 @@ export function Header() {
               className="md:hidden border-t bg-background"
             >
               <div className="container mx-auto px-4 py-4 flex flex-col gap-2">
-                <Link 
-                  to="/" 
+                <Link
+                  to="/"
                   className="px-4 py-3 rounded-lg hover:bg-muted transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Browse Professionals
                 </Link>
-                {user && (
-                  <Link 
-                    to="/favorites" 
-                    className="px-4 py-3 rounded-lg hover:bg-muted transition-colors flex items-center gap-2"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <Heart size={18} />
-                    My Favorites
-                  </Link>
-                )}
                 <div className="border-t my-2" />
                 {user ? (
                   <>

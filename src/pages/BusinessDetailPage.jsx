@@ -1,15 +1,13 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { 
-  ArrowLeft, 
-  Bookmark, 
-  Heart, 
-  Phone, 
-  Mail, 
-  Globe, 
-  MapPin,
-  Trophy,
+import {
+  ArrowLeft,
+  Bookmark,
+  Heart,
+  Phone,
+  Mail,
+  Globe,
   User,
   Send
 } from 'lucide-react'
@@ -17,39 +15,33 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { useProfessional } from '@/hooks/useProfessionals'
+import { useBusiness } from '@/hooks/useBusinesses'
 import { useFavorites } from '@/hooks/useFavorites'
 import { useRecommendations } from '@/hooks/useRecommendations'
 import { useAuth } from '@/hooks/useAuth'
 import { toast } from '@/hooks/useToast'
+import { BookmarkDialog } from '@/components/BookmarkDialog'
 
-export function ProfessionalDetailPage() {
+export function BusinessDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const { user, profile } = useAuth()
-  
-  const { professional, loading, error } = useProfessional(id)
+  const { user } = useAuth()
+
+  const { business, loading, error } = useBusiness(id)
   const { isFavorite, toggleFavorite } = useFavorites()
   const { addRecommendation, hasRecommended, loading: recLoading } = useRecommendations()
-  
+
   const [recommendNote, setRecommendNote] = useState('')
   const [showRecommendForm, setShowRecommendForm] = useState(false)
   const [alreadyRecommended, setAlreadyRecommended] = useState(false)
+  const [showBookmarkDialog, setShowBookmarkDialog] = useState(false)
 
-  // Check if user already recommended this professional
+  // Check if user already recommended this business
   useEffect(() => {
     if (user && id) {
       hasRecommended(id).then(setAlreadyRecommended)
     }
   }, [user, id, hasRecommended])
-
-  // Show recommend form if coming from favorite action
-  useEffect(() => {
-    if (searchParams.get('recommend') === 'true' && user) {
-      setShowRecommendForm(true)
-    }
-  }, [searchParams, user])
 
   const handleFavoriteClick = async () => {
     if (!user) {
@@ -61,11 +53,19 @@ export function ProfessionalDetailPage() {
       return
     }
 
-    const result = await toggleFavorite(id)
-    if (!result.error) {
+    // Check if it's currently favorited BEFORE toggling
+    const wasAlreadyFavorited = isFavorite(id)
+
+    await toggleFavorite(id)
+
+    // If it wasn't favorited before, it was just added - show dialog
+    if (!wasAlreadyFavorited) {
+      setShowBookmarkDialog(true)
+    } else {
+      // It was favorited before, so it was just removed
       toast({
-        title: isFavorite(id) ? "Removed from favorites" : "Added to favorites",
-        variant: "success"
+        title: "Removed from favorites",
+        variant: "default"
       })
     }
   }
@@ -74,14 +74,14 @@ export function ProfessionalDetailPage() {
     if (!user) {
       toast({
         title: "Sign in required",
-        description: "Please sign in to recommend professionals.",
+        description: "Please sign in to recommend businesses.",
         variant: "destructive"
       })
       return
     }
 
     const { error } = await addRecommendation(id, recommendNote)
-    
+
     if (error) {
       toast({
         title: "Error",
@@ -100,13 +100,6 @@ export function ProfessionalDetailPage() {
     }
   }
 
-  const isPreferredPartner = () => {
-    if (!profile?.neighborhood_id || !professional?.preferred_neighborhoods) return false
-    return professional.preferred_neighborhoods.some(
-      pn => pn.neighborhood?.id === profile.neighborhood_id
-    )
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -115,21 +108,18 @@ export function ProfessionalDetailPage() {
     )
   }
 
-  if (error || !professional) {
+  if (error || !business) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <p className="text-muted-foreground">Professional not found</p>
+        <p className="text-muted-foreground">Business not found</p>
         <Button onClick={() => navigate('/')}>Go Back</Button>
       </div>
     )
   }
 
-  const subcategoryList = professional.subcategories
-    ?.map(ps => ps.subcategory?.name)
-    .filter(Boolean) || []
-
-  const recommendations = professional.recommendations || []
-  const preferred = isPreferredPartner()
+  const primaryCategory = business.business_services?.[0]?.service?.subcategory?.category
+  const services = business.business_services?.map(bs => bs.service).filter(Boolean) || []
+  const recommendations = business.recommendations || []
 
   return (
     <div className="min-h-screen pb-12">
@@ -152,74 +142,37 @@ export function ProfessionalDetailPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              <Card className={preferred ? 'ring-2 ring-primary/30' : ''}>
+              <Card>
                 <CardContent className="p-6">
-                  <div className="flex flex-col sm:flex-row gap-6">
-                    {/* Avatar */}
-                    <div className="flex-shrink-0 w-24 h-24 rounded-2xl overflow-hidden bg-gradient-to-br from-primary/20 via-background to-accent/10">
-                      {professional.photo_url ? (
-                        <img
-                          src={professional.photo_url}
-                          alt={professional.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          {professional.emoji ? (
-                            <span className="text-4xl">{professional.emoji}</span>
-                          ) : (
-                            <User className="h-12 w-12 text-primary/60" />
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Info */}
+                  <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <h1 className="text-2xl md:text-3xl font-display font-bold">
-                            {professional.name}
-                          </h1>
-                          <div className="flex items-center gap-2 mt-2 flex-wrap">
-                            {preferred && (
-                              <Badge className="gap-1">
-                                <Trophy size={12} />
-                                Neighborhood Favorite
-                              </Badge>
+                      <h1 className="text-2xl md:text-3xl font-display font-bold">
+                        {business.name}
+                      </h1>
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        {primaryCategory && (
+                          <Badge variant="secondary">
+                            {primaryCategory.emoji && (
+                              <span className="mr-1">{primaryCategory.emoji}</span>
                             )}
-                            {professional.category?.name && (
-                              <Badge variant="secondary">
-                                {professional.category.emoji && (
-                                  <span className="mr-1">{professional.category.emoji}</span>
-                                )}
-                                {professional.category.name}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={handleFavoriteClick}
-                          className="flex-shrink-0"
-                        >
-                          <Bookmark
-                            size={20}
-                            className={isFavorite(id) ? 'fill-primary text-primary' : ''}
-                          />
-                        </Button>
+                            {primaryCategory.name}
+                          </Badge>
+                        )}
                       </div>
 
-                      {/* Subcategories */}
-                      {subcategoryList.length > 0 && (
+                      {/* Services */}
+                      {services.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-4">
-                          {subcategoryList.map((name, i) => (
+                          {services.slice(0, 5).map((service, i) => (
                             <Badge key={i} variant="outline">
-                              {name}
+                              {service.name}
                             </Badge>
                           ))}
+                          {services.length > 5 && (
+                            <Badge variant="outline">
+                              +{services.length - 5} more
+                            </Badge>
+                          )}
                         </div>
                       )}
 
@@ -234,13 +187,25 @@ export function ProfessionalDetailPage() {
                         </div>
                       )}
                     </div>
+
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handleFavoriteClick}
+                      className="flex-shrink-0"
+                    >
+                      <Bookmark
+                        size={20}
+                        className={isFavorite(id) ? 'fill-primary text-primary' : ''}
+                      />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
             </motion.div>
 
             {/* Description */}
-            {professional.description && (
+            {business.description && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -252,7 +217,7 @@ export function ProfessionalDetailPage() {
                   </CardHeader>
                   <CardContent>
                     <p className="text-muted-foreground leading-relaxed">
-                      {professional.description}
+                      {business.description}
                     </p>
                   </CardContent>
                 </Card>
@@ -287,7 +252,7 @@ export function ProfessionalDetailPage() {
                       className="mb-6 p-4 bg-muted/50 rounded-lg"
                     >
                       <p className="text-sm text-muted-foreground mb-3">
-                        Share why you recommend this professional:
+                        Share why you recommend this business:
                       </p>
                       <div className="flex gap-2">
                         <Input
@@ -357,27 +322,27 @@ export function ProfessionalDetailPage() {
                   <CardTitle>Contact</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {professional.phone && (
+                  {business.phone && (
                     <a
-                      href={`tel:${professional.phone}`}
+                      href={`tel:${business.phone}`}
                       className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                     >
                       <Phone size={18} className="text-primary" />
-                      <span>{professional.phone}</span>
+                      <span>{business.phone}</span>
                     </a>
                   )}
-                  {professional.email && (
+                  {business.email && (
                     <a
-                      href={`mailto:${professional.email}`}
+                      href={`mailto:${business.email}`}
                       className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                     >
                       <Mail size={18} className="text-primary" />
-                      <span className="truncate">{professional.email}</span>
+                      <span className="truncate">{business.email}</span>
                     </a>
                   )}
-                  {professional.website && (
+                  {business.website && (
                     <a
-                      href={professional.website}
+                      href={business.website}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
@@ -386,7 +351,7 @@ export function ProfessionalDetailPage() {
                       <span className="truncate">Visit Website</span>
                     </a>
                   )}
-                  {!professional.phone && !professional.email && !professional.website && (
+                  {!business.phone && !business.email && !business.website && (
                     <p className="text-muted-foreground text-sm">
                       No contact information available.
                     </p>
@@ -394,36 +359,16 @@ export function ProfessionalDetailPage() {
                 </CardContent>
               </Card>
             </motion.div>
-
-            {/* Service Areas */}
-            {professional.preferred_neighborhoods?.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2 }}
-              >
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <MapPin size={18} />
-                      Service Areas
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-wrap gap-2">
-                      {professional.preferred_neighborhoods.map((pn, i) => (
-                        <Badge key={i} variant="secondary">
-                          {pn.neighborhood?.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )}
           </div>
         </div>
       </div>
+
+      <BookmarkDialog
+        open={showBookmarkDialog}
+        onOpenChange={setShowBookmarkDialog}
+        business={business}
+        hasRecommended={alreadyRecommended}
+      />
     </div>
   )
 }

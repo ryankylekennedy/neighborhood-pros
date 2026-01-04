@@ -3,7 +3,7 @@ import { AuthProvider } from '@/hooks/useAuth'
 import { Header } from '@/components/Header'
 import { Toaster } from '@/components/ui/toaster'
 import { HomePage } from '@/pages/HomePage'
-import { ProfessionalDetailPage } from '@/pages/ProfessionalDetailPage'
+import { BusinessDetailPage } from '@/pages/BusinessDetailPage'
 import { FavoritesPage } from '@/pages/FavoritesPage'
 import { ProfilePage } from '@/pages/ProfilePage'
 
@@ -16,7 +16,7 @@ function App() {
           <main>
             <Routes>
               <Route path="/" element={<HomePage />} />
-              <Route path="/professional/:id" element={<ProfessionalDetailPage />} />
+              <Route path="/business/:id" element={<BusinessDetailPage />} />
               <Route path="/favorites" element={<FavoritesPage />} />
               <Route path="/profile" element={<ProfilePage />} />
             </Routes>

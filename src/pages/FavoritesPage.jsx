@@ -1,38 +1,42 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Bookmark, ArrowLeft, Heart } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { ProfessionalCard } from '@/components/ProfessionalCard'
+import { BusinessCard } from '@/components/BusinessCard'
 import { useFavorites } from '@/hooks/useFavorites'
 import { useAuth } from '@/hooks/useAuth'
 import { toast } from '@/hooks/useToast'
+import { BookmarkDialog } from '@/components/BookmarkDialog'
 
 export function FavoritesPage() {
   const navigate = useNavigate()
-  const { user, profile } = useAuth()
+  const { user } = useAuth()
   const { favorites, loading, isFavorite, toggleFavorite } = useFavorites()
+  const [showBookmarkDialog, setShowBookmarkDialog] = useState(false)
+  const [selectedBusiness, setSelectedBusiness] = useState(null)
 
-  const userNeighborhoodId = profile?.neighborhood_id || null
+  const handleFavoriteClick = async (business) => {
+    // Check if it's currently favorited BEFORE toggling
+    const wasAlreadyFavorited = isFavorite(business.id)
 
-  const isPreferredPartner = (professional) => {
-    if (!userNeighborhoodId || !professional?.preferred_neighborhoods) return false
-    return professional.preferred_neighborhoods.some(
-      pn => pn.neighborhood?.id === userNeighborhoodId
-    )
-  }
+    await toggleFavorite(business.id)
 
-  const handleFavoriteClick = async (professional) => {
-    const result = await toggleFavorite(professional.id)
-    if (!result.error) {
+    // If it wasn't favorited before, it was just added - show dialog
+    if (!wasAlreadyFavorited) {
+      setSelectedBusiness(business)
+      setShowBookmarkDialog(true)
+    } else {
+      // It was favorited before, so it was just removed
       toast({
         title: "Removed from favorites",
-        description: `${professional.name} has been removed from your favorites.`
+        description: `${business.name} has been removed from your favorites.`
       })
     }
   }
 
-  const handleCardClick = (professional) => {
-    navigate(`/professional/${professional.id}`)
+  const handleCardClick = (business) => {
+    navigate(`/business/${business.id}`)
   }
 
   // If not logged in
@@ -61,10 +65,10 @@ export function FavoritesPage() {
               Sign in to see your favorites
             </h2>
             <p className="text-muted-foreground max-w-md mb-6">
-              Create an account to save your favorite professionals and get personalized recommendations.
+              Create an account to save your favorite businesses and get personalized recommendations.
             </p>
             <Button onClick={() => navigate('/')}>
-              Browse Professionals
+              Browse Businesses
             </Button>
           </motion.div>
         </div>
@@ -93,7 +97,7 @@ export function FavoritesPage() {
             My Favorites
           </h1>
           <p className="text-muted-foreground mt-2">
-            Your saved professionals for quick access
+            Your saved businesses for quick access
           </p>
         </motion.div>
 
@@ -116,10 +120,10 @@ export function FavoritesPage() {
             </div>
             <h3 className="text-xl font-semibold mb-2">No favorites yet</h3>
             <p className="text-muted-foreground max-w-md mb-6">
-              Start browsing professionals and bookmark the ones you like to build your personal list.
+              Start browsing businesses and bookmark the ones you like to build your personal list.
             </p>
             <Button onClick={() => navigate('/')}>
-              Browse Professionals
+              Browse Businesses
             </Button>
           </motion.div>
         )}
@@ -128,19 +132,25 @@ export function FavoritesPage() {
         {!loading && favorites.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {favorites.map((fav, index) => (
-              <ProfessionalCard
+              <BusinessCard
                 key={fav.id}
-                professional={fav.professional}
+                business={fav.business}
                 isFavorite={true}
-                isPreferred={isPreferredPartner(fav.professional)}
-                onFavoriteClick={() => handleFavoriteClick(fav.professional)}
-                onClick={() => handleCardClick(fav.professional)}
+                onFavoriteClick={() => handleFavoriteClick(fav.business)}
+                onClick={() => handleCardClick(fav.business)}
                 animationDelay={index * 0.05}
               />
             ))}
           </div>
         )}
       </div>
+
+      <BookmarkDialog
+        open={showBookmarkDialog}
+        onOpenChange={setShowBookmarkDialog}
+        business={selectedBusiness}
+        hasRecommended={false}
+      />
     </div>
   )
 }

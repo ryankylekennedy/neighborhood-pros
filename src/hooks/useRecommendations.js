@@ -6,17 +6,17 @@ export function useRecommendations() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
 
-  const addRecommendation = async (professionalId, note = '') => {
+  const addRecommendation = async (businessId, note = '') => {
     if (!user) return { error: { message: 'Must be logged in to recommend' } }
 
     try {
       setLoading(true)
       const { data, error } = await supabase
         .from('recommendations')
-        .insert({ 
-          user_id: user.id, 
-          professional_id: professionalId,
-          note 
+        .insert({
+          user_id: user.id,
+          business_id: businessId,
+          note
         })
         .select()
         .single()
@@ -30,7 +30,7 @@ export function useRecommendations() {
     }
   }
 
-  const removeRecommendation = async (professionalId) => {
+  const removeRecommendation = async (businessId) => {
     if (!user) return { error: { message: 'Must be logged in' } }
 
     try {
@@ -39,7 +39,7 @@ export function useRecommendations() {
         .from('recommendations')
         .delete()
         .eq('user_id', user.id)
-        .eq('professional_id', professionalId)
+        .eq('business_id', businessId)
 
       if (error) throw error
       return { success: true }
@@ -50,7 +50,7 @@ export function useRecommendations() {
     }
   }
 
-  const hasRecommended = useCallback(async (professionalId) => {
+  const hasRecommended = useCallback(async (businessId) => {
     if (!user) return false
 
     try {
@@ -58,28 +58,56 @@ export function useRecommendations() {
         .from('recommendations')
         .select('id')
         .eq('user_id', user.id)
-        .eq('professional_id', professionalId)
-        .single()
+        .eq('business_id', businessId)
+        .maybeSingle()
 
-      return !error && !!data
+      if (error) return false
+      return !!data
     } catch {
       return false
     }
   }, [user])
 
-  const getRecommendationsForProfessional = async (professionalId) => {
+  const getRecommendationsForBusiness = async (businessId) => {
     try {
-      const { data, error } = await supabase
+      const { data: recommendationsData, error } = await supabase
         .from('recommendations')
-        .select(`
-          *,
-          user:profiles(id, full_name, avatar_url)
-        `)
-        .eq('professional_id', professionalId)
+        .select('*')
+        .eq('business_id', businessId)
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      return { data }
+
+      // Fetch user profiles for the recommendations
+      const userIds = recommendationsData?.map(rec => rec.user_id).filter(Boolean) || []
+      let profilesMap = {}
+
+      if (userIds.length > 0) {
+        try {
+          const { data: profilesData, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url')
+            .in('id', userIds)
+
+          if (!profileError && profilesData) {
+            profilesMap = profilesData.reduce((acc, profile) => {
+              acc[profile.id] = profile
+              return acc
+            }, {})
+          }
+        } catch (profileErr) {
+          console.error('Error fetching profiles:', profileErr)
+          // Continue without profiles if fetch fails
+        }
+      }
+
+      // Combine recommendations with user profiles
+      const transformedData = recommendationsData?.map(rec => ({
+        ...rec,
+        user: profilesMap[rec.user_id] || null
+      })) || []
+
+      return { data: transformedData }
     } catch (error) {
       return { error }
     }
@@ -90,6 +118,6 @@ export function useRecommendations() {
     addRecommendation,
     removeRecommendation,
     hasRecommended,
-    getRecommendationsForProfessional
+    getRecommendationsForBusiness
   }
 }

@@ -10,7 +10,7 @@ export function useFavorites() {
 
   useEffect(() => {
     if (authLoading) return
-    
+
     if (!user) {
       setFavorites([])
       fetchedForUser.current = null
@@ -20,6 +20,7 @@ export function useFavorites() {
     if (fetchedForUser.current === user.id) return
 
     fetchFavorites()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading])
 
   async function fetchFavorites() {

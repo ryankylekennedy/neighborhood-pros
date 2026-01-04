@@ -1,6 +1,25 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 
+// Common stop words to filter out from search
+const STOP_WORDS = new Set([
+  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'has', 'he',
+  'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the', 'to', 'was', 'will',
+  'with', 'i', 'need', 'want', 'looking', 'help', 'my', 'me', 'can', 'you'
+])
+
+// Extract meaningful keywords from search query
+function extractKeywords(query) {
+  if (!query || !query.trim()) return []
+
+  return query
+    .toLowerCase()
+    .split(/\s+/) // Split by whitespace
+    .map(word => word.replace(/[^a-z0-9]/g, '')) // Remove special chars
+    .filter(word => word.length >= 3) // Keep words with 3+ chars
+    .filter(word => !STOP_WORDS.has(word)) // Remove stop words
+}
+
 export function useBusinesses({ subcategoryId = null, serviceId = null, searchQuery = '', limit = 12 } = {}) {
   const [businesses, setBusinesses] = useState([])
   const [loading, setLoading] = useState(true)
@@ -11,6 +30,7 @@ export function useBusinesses({ subcategoryId = null, serviceId = null, searchQu
   useEffect(() => {
     setOffset(0)
     fetchBusinesses(0, true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subcategoryId, serviceId, searchQuery])
 
   async function fetchBusinesses(newOffset = 0, reset = false) {
@@ -18,26 +38,136 @@ export function useBusinesses({ subcategoryId = null, serviceId = null, searchQu
       setLoading(true)
       setError(null)
 
-      // First get the businesses
+      // Extract keywords from search query
+      const keywords = extractKeywords(searchQuery)
+
+      // Get all businesses first (we'll filter based on keywords later)
       let query = supabase
         .from('businesses')
         .select('*')
         .eq('status', 'approved')
         .order('created_at', { ascending: false })
-        .range(newOffset, newOffset + limit - 1)
 
-      // Search by name or description
-      if (searchQuery.trim()) {
-        query = query.or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`)
+      // If we have keywords, build a flexible search query
+      if (keywords.length > 0) {
+        // Build OR conditions for each keyword across name and description
+        const searchConditions = keywords.flatMap(keyword => [
+          `name.ilike.%${keyword}%`,
+          `description.ilike.%${keyword}%`
+        ]).join(',')
+
+        query = query.or(searchConditions)
       }
+
+      // Apply pagination
+      query = query.range(newOffset, newOffset + limit - 1)
 
       const { data: businessData, error: fetchError } = await query
 
       if (fetchError) throw fetchError
 
+      // Also search for businesses by service names and subcategories if we have keywords
+      let serviceMatchedBusinessIds = []
+      if (keywords.length > 0) {
+        // Build search conditions for service names
+        const serviceSearchConditions = keywords.map(keyword =>
+          `name.ilike.%${keyword}%`
+        ).join(',')
+
+        const { data: matchingServices } = await supabase
+          .from('services')
+          .select('id')
+          .or(serviceSearchConditions)
+
+        if (matchingServices && matchingServices.length > 0) {
+          const serviceIds = matchingServices.map(s => s.id)
+
+          const { data: businessServiceLinks } = await supabase
+            .from('business_services')
+            .select('business_id')
+            .in('service_id', serviceIds)
+
+          if (businessServiceLinks) {
+            serviceMatchedBusinessIds = [...new Set(businessServiceLinks.map(bs => bs.business_id))]
+
+            // Fetch businesses that match via services
+            let serviceQuery = supabase
+              .from('businesses')
+              .select('*')
+              .eq('status', 'approved')
+              .in('id', serviceMatchedBusinessIds)
+
+            // Exclude already fetched businesses
+            const existingIds = businessData.map(b => b.id)
+            if (existingIds.length > 0) {
+              serviceQuery = serviceQuery.not('id', 'in', `(${existingIds.join(',')})`)
+            }
+
+            const { data: serviceMatchedBusinesses } = await serviceQuery
+
+            if (serviceMatchedBusinesses && serviceMatchedBusinesses.length > 0) {
+              businessData = [...businessData, ...serviceMatchedBusinesses]
+            }
+          }
+        }
+
+        // Also search for businesses by subcategory names
+        const subcategorySearchConditions = keywords.map(keyword =>
+          `name.ilike.%${keyword}%`
+        ).join(',')
+
+        const { data: matchingSubcategories } = await supabase
+          .from('subcategories')
+          .select('id')
+          .or(subcategorySearchConditions)
+
+        if (matchingSubcategories && matchingSubcategories.length > 0) {
+          const subcategoryIds = matchingSubcategories.map(sc => sc.id)
+
+          // Get services in these subcategories
+          const { data: subcategoryServices } = await supabase
+            .from('services')
+            .select('id')
+            .in('subcategory_id', subcategoryIds)
+
+          if (subcategoryServices && subcategoryServices.length > 0) {
+            const subcategoryServiceIds = subcategoryServices.map(s => s.id)
+
+            // Get businesses offering these services
+            const { data: subcategoryBusinessLinks } = await supabase
+              .from('business_services')
+              .select('business_id')
+              .in('service_id', subcategoryServiceIds)
+
+            if (subcategoryBusinessLinks && subcategoryBusinessLinks.length > 0) {
+              const subcategoryMatchedBusinessIds = [...new Set(subcategoryBusinessLinks.map(bs => bs.business_id))]
+
+              // Fetch businesses that match via subcategories
+              let subcategoryQuery = supabase
+                .from('businesses')
+                .select('*')
+                .eq('status', 'approved')
+                .in('id', subcategoryMatchedBusinessIds)
+
+              // Exclude already fetched businesses
+              const existingIds = businessData.map(b => b.id)
+              if (existingIds.length > 0) {
+                subcategoryQuery = subcategoryQuery.not('id', 'in', `(${existingIds.join(',')})`)
+              }
+
+              const { data: subcategoryMatchedBusinesses } = await subcategoryQuery
+
+              if (subcategoryMatchedBusinesses && subcategoryMatchedBusinesses.length > 0) {
+                businessData = [...businessData, ...subcategoryMatchedBusinesses]
+              }
+            }
+          }
+        }
+      }
+
       // Now get the services for each business
       const businessIds = businessData?.map(b => b.id) || []
-      
+
       let businessesWithServices = businessData || []
 
       if (businessIds.length > 0) {
@@ -201,4 +331,108 @@ export function useServices(subcategoryId = null) {
   }, [subcategoryId])
 
   return { services, loading }
+}
+
+export function useBusiness(id) {
+  const [business, setBusiness] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    if (!id) {
+      setLoading(false)
+      return
+    }
+
+    async function fetchBusiness() {
+      try {
+        setLoading(true)
+        setError(null)
+
+        // Fetch the business
+        const { data: businessData, error: fetchError } = await supabase
+          .from('businesses')
+          .select('*')
+          .eq('id', id)
+          .single()
+
+        if (fetchError) throw fetchError
+
+        // Fetch services for this business
+        const { data: servicesData } = await supabase
+          .from('business_services')
+          .select(`
+            business_id,
+            service:services (
+              id,
+              name,
+              subcategory:subcategories (
+                id,
+                name,
+                category:categories (
+                  id,
+                  name,
+                  emoji
+                )
+              )
+            )
+          `)
+          .eq('business_id', id)
+
+        // Fetch recommendations for this business
+        const { data: recommendationsData } = await supabase
+          .from('recommendations')
+          .select('*')
+          .eq('business_id', id)
+          .order('created_at', { ascending: false })
+
+        // Fetch user profiles for the recommendations
+        const userIds = recommendationsData?.map(rec => rec.user_id).filter(Boolean) || []
+        let profilesMap = {}
+
+        if (userIds.length > 0) {
+          try {
+            const { data: profilesData, error: profileError } = await supabase
+              .from('profiles')
+              .select('id, full_name, avatar_url')
+              .in('id', userIds)
+
+            if (!profileError && profilesData) {
+              profilesMap = profilesData.reduce((acc, profile) => {
+                acc[profile.id] = profile
+                return acc
+              }, {})
+            }
+          } catch (profileErr) {
+            console.error('Error fetching profiles:', profileErr)
+            // Continue without profiles if fetch fails
+          }
+        }
+
+        // Combine recommendations with user profiles
+        const recommendationsWithUsers = recommendationsData?.map(rec => ({
+          ...rec,
+          user: profilesMap[rec.user_id] || null
+        })) || []
+
+        // Combine everything
+        const businessWithDetails = {
+          ...businessData,
+          business_services: servicesData || [],
+          recommendations: recommendationsWithUsers
+        }
+
+        setBusiness(businessWithDetails)
+      } catch (err) {
+        console.error('Error fetching business:', err)
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchBusiness()
+  }, [id])
+
+  return { business, loading, error }
 }
