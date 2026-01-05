@@ -204,7 +204,6 @@ export function HomePage() {
                 ref={searchInputRef}
                 type="text"
                 placeholder="Search businesses..."
-                data-testid="search-input"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={handleSearchFocus}
@@ -228,7 +227,6 @@ export function HomePage() {
                     variant="ghost"
                     onClick={handleSearchCancel}
                     className="text-primary hover:text-primary/80"
-                    data-testid="search-cancel-button"
                   >
                     Cancel
                   </Button>
@@ -236,7 +234,6 @@ export function HomePage() {
                     variant="ghost"
                     onClick={handleSearchSubmit}
                     className="text-primary hover:text-primary/80"
-                    data-testid="search-submit-button"
                   >
                     Search
                   </Button>
@@ -250,7 +247,6 @@ export function HomePage() {
                       ref={searchInputRef}
                       type="text"
                       placeholder="Describe your project or problem — be as detailed as you want"
-                      data-testid="search-input"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onBlur={(e) => {
@@ -410,7 +406,7 @@ export function HomePage() {
 
             {/* Clear Filters */}
             {isFilterActive && (
-              <Button variant="ghost" onClick={clearFilters} className="gap-2" data-testid="clear-filters-button">
+              <Button variant="ghost" onClick={clearFilters} className="gap-2">
                 <X size={16} />
                 Clear filters
               </Button>

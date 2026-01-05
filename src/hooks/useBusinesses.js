@@ -62,7 +62,7 @@ export function useBusinesses({ subcategoryId = null, serviceId = null, searchQu
       // Apply pagination
       query = query.range(newOffset, newOffset + limit - 1)
 
-      let { data: businessData, error: fetchError } = await query
+      const { data: businessData, error: fetchError } = await query
 
       if (fetchError) throw fetchError
 
