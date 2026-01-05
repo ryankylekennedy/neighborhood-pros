@@ -1,0 +1,71 @@
+# Claude Code Instructions for Neighborhood-Pros
+
+## Project Context
+
+You're working on a web application called "neighborhood-pros" - a platform connecting homeowners with local service providers.
+
+**Tech Stack:**
+- Frontend: React (in `/src`)
+- Backend: Supabase (PostgreSQL database, Auth, Storage)
+- Testing: Playwright for end-to-end tests
+- The developer (Ryan) identifies as non-technical and prefers GUI tools
+
+## Ralph Wiggum Strategy
+
+You have access to `ralph_scratchpad.md` - this is YOUR thinking space.
+
+**Use it liberally:**
+- Work through complex problems
+- Think out loud about approaches
+- Note gotchas and learnings
+- Plan before implementing
+- Ask yourself questions
+- Be messy - this is your scratch paper
+
+**When to use Ralph:**
+- Before making significant code changes
+- When you're unsure about an approach
+- To break down complex tasks
+- To think through database schema changes
+- To plan testing strategies
+- When dealing with Supabase migrations or RLS policies
+
+**You don't need permission** - just use ralph_scratchpad.md whenever you need to think through something. The scratchpad can get messy and disorganized. That's the point. Work it out there, then write clean code.
+
+## Working with the Full Stack
+
+You have autonomy to make changes across:
+- **Frontend**: React components, routing, state management
+- **Backend**: Supabase database schema, RLS policies, storage buckets
+- **Tests**: Playwright end-to-end tests
+
+When making changes:
+1. Use Ralph's scratchpad to think through the full-stack implications
+2. Consider what database changes are needed
+3. Think about RLS policies for security
+4. Plan what Playwright tests should verify the changes
+
+## Database Changes
+
+For Supabase schema changes:
+- Create migration files in the appropriate location
+- Think through RLS (Row Level Security) policies
+- Consider what storage buckets might be needed
+- Use Ralph's scratchpad to plan migrations before writing them
+
+## Testing Philosophy
+
+- Write Playwright tests that verify the full user flow
+- Test authentication and authorization
+- Verify database operations work correctly
+- Include proper test data isolation
+
+## Communication Style
+
+Ryan prefers:
+- Detailed, non-technical explanations
+- GUI-based solutions when possible
+- Clear step-by-step instructions
+- Understanding the "why" behind technical decisions
+
+When you need clarification, ask! But feel empowered to make reasonable decisions and iterate.
