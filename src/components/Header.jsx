@@ -105,20 +105,21 @@ export function Header() {
               ) : user ? (
                 <div className="flex items-center gap-3">
                   <Link to="/profile">
-                    <Button variant="ghost" size="sm" className="gap-2">
+                    <Button variant="ghost" size="sm" className="gap-2" data-testid="profile-button">
                       <User size={16} />
                       {profile?.full_name || 'Profile'}
                     </Button>
                   </Link>
-                  <Button variant="outline" size="sm" onClick={handleSignOut}>
+                  <Button variant="outline" size="sm" onClick={handleSignOut} data-testid="logout-button">
                     <LogOut size={16} />
                   </Button>
                 </div>
               ) : (
                 <>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     size="sm"
+                    data-testid="signin-button"
                     onClick={() => {
                       setAuthMode('signin')
                       setAuthDialogOpen(true)
@@ -126,8 +127,9 @@ export function Header() {
                   >
                     Sign In
                   </Button>
-                  <Button 
+                  <Button
                     size="sm"
+                    data-testid="get-started-button"
                     onClick={() => {
                       setAuthMode('signup')
                       setAuthDialogOpen(true)
@@ -144,6 +146,7 @@ export function Header() {
               variant="ghost"
               size="icon"
               className="md:hidden"
+              data-testid="mobile-menu-button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
               {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -234,13 +237,14 @@ export function Header() {
             </DialogDescription>
           </DialogHeader>
           
-          <form onSubmit={handleAuthSubmit} className="space-y-4 mt-4">
+          <form onSubmit={handleAuthSubmit} className="space-y-4 mt-4" data-testid="auth-form">
             {authMode === 'signup' && (
               <div className="space-y-2">
                 <label className="text-sm font-medium">Full Name</label>
                 <Input
                   type="text"
                   placeholder="Your name"
+                  data-testid="fullname-input"
                   value={formData.fullName}
                   onChange={(e) => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
                   required={authMode === 'signup'}
@@ -252,6 +256,7 @@ export function Header() {
               <Input
                 type="email"
                 placeholder="you@example.com"
+                data-testid="email-input"
                 value={formData.email}
                 onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                 required
@@ -262,14 +267,15 @@ export function Header() {
               <Input
                 type="password"
                 placeholder="••••••••"
+                data-testid="password-input"
                 value={formData.password}
                 onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
                 required
                 minLength={6}
               />
             </div>
-            
-            <Button type="submit" className="w-full" disabled={authLoading}>
+
+            <Button type="submit" className="w-full" data-testid="auth-submit-button" disabled={authLoading}>
               {authLoading ? 'Loading...' : authMode === 'signin' ? 'Sign In' : 'Create Account'}
             </Button>
           </form>
