@@ -62,9 +62,11 @@ export function useBusinesses({ subcategoryId = null, serviceId = null, searchQu
       // Apply pagination
       query = query.range(newOffset, newOffset + limit - 1)
 
-      const { data: businessData, error: fetchError } = await query
+      const { data, error: fetchError } = await query
 
       if (fetchError) throw fetchError
+
+      let businessData = data
 
       // Also search for businesses by service names and subcategories if we have keywords
       let serviceMatchedBusinessIds = []

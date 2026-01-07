@@ -6,6 +6,9 @@ import { HomePage } from '@/pages/HomePage'
 import { BusinessDetailPage } from '@/pages/BusinessDetailPage'
 import { FavoritesPage } from '@/pages/FavoritesPage'
 import { ProfilePage } from '@/pages/ProfilePage'
+import { InviteWelcomePage } from '@/pages/InviteWelcomePage'
+import { OnboardingPage } from '@/pages/OnboardingPage'
+import { AdminInvitesPage } from '@/pages/AdminInvitesPage'
 
 function App() {
   return (
@@ -16,9 +19,12 @@ function App() {
           <main>
             <Routes>
               <Route path="/" element={<HomePage />} />
+              <Route path="/invite/:code" element={<InviteWelcomePage />} />
+              <Route path="/onboarding" element={<OnboardingPage />} />
               <Route path="/business/:id" element={<BusinessDetailPage />} />
               <Route path="/favorites" element={<FavoritesPage />} />
               <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/admin/invites" element={<AdminInvitesPage />} />
             </Routes>
           </main>
           <Toaster />

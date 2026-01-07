@@ -123,6 +123,52 @@ export function AuthProvider({ children }) {
     return { data, error }
   }
 
+  const signUpWithInvite = async (email, password, fullName, neighborhoodId, address, inviteCode) => {
+    try {
+      // 1. Create auth account
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name: fullName }
+        }
+      })
+
+      if (authError) return { error: authError }
+
+      // 2. Update profile with neighborhood and address
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          full_name: fullName,
+          neighborhood_id: neighborhoodId,
+          address: address
+        })
+        .eq('id', authData.user.id)
+
+      if (profileError) return { error: profileError }
+
+      // 3. Redeem invite code
+      const { data: redeemData, error: redeemError } = await supabase
+        .rpc('redeem_invite_code', {
+          p_code: inviteCode,
+          p_user_id: authData.user.id
+        })
+
+      if (redeemError) {
+        return { error: new Error(redeemError.message || 'Failed to redeem invite code') }
+      }
+
+      if (!redeemData || !redeemData.success) {
+        return { error: new Error(redeemData?.error || 'Invalid invite code') }
+      }
+
+      return { data: authData, error: null }
+    } catch (error) {
+      return { error }
+    }
+  }
+
   const signIn = async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -173,6 +219,7 @@ export function AuthProvider({ children }) {
     profile,
     loading,
     signUp,
+    signUpWithInvite,
     signIn,
     signOut,
     updateProfile,

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, X, User, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
+import { supabase } from '@/lib/supabase'
 import {
   Dialog,
   DialogContent,
@@ -19,7 +20,7 @@ export function Header() {
   const navigate = useNavigate()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [authDialogOpen, setAuthDialogOpen] = useState(false)
-  const [authMode, setAuthMode] = useState('signin') // 'signin' or 'signup'
+  const [authMode, setAuthMode] = useState('signin') // 'signin', 'signup', or 'reset'
   const [authLoading, setAuthLoading] = useState(false)
   const [formData, setFormData] = useState({
     email: '',
@@ -32,7 +33,18 @@ export function Header() {
     setAuthLoading(true)
 
     try {
-      if (authMode === 'signup') {
+      if (authMode === 'reset') {
+        const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+          redirectTo: `${window.location.origin}/reset-password`
+        })
+        if (error) throw error
+        toast({
+          title: "Check your email",
+          description: "We sent you a password reset link.",
+          variant: "success"
+        })
+        setAuthDialogOpen(false)
+      } else if (authMode === 'signup') {
         const { error } = await signUp(formData.email, formData.password, formData.fullName)
         if (error) throw error
         toast({
@@ -96,6 +108,14 @@ export function Header() {
               >
                 Browse
               </Link>
+              {user && profile?.neighborhood_id && (
+                <Link
+                  to="/admin/invites"
+                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Admin
+                </Link>
+              )}
             </nav>
 
             {/* Auth Buttons */}
@@ -168,6 +188,15 @@ export function Header() {
                 >
                   Browse Professionals
                 </Link>
+                {user && profile?.neighborhood_id && (
+                  <Link
+                    to="/admin/invites"
+                    className="px-4 py-3 rounded-lg hover:bg-muted transition-colors"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Manage Invites
+                  </Link>
+                )}
                 <div className="border-t my-2" />
                 {user ? (
                   <>
@@ -225,12 +254,14 @@ export function Header() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-2xl">
-              {authMode === 'signin' ? 'Welcome back' : 'Create an account'}
+              {authMode === 'reset' ? 'Reset password' : authMode === 'signin' ? 'Welcome back' : 'Create an account'}
             </DialogTitle>
             <DialogDescription>
-              {authMode === 'signin' 
-                ? 'Sign in to save favorites and recommend professionals.'
-                : 'Join your neighborhood and discover trusted local pros.'}
+              {authMode === 'reset'
+                ? 'Enter your email and we\'ll send you a password reset link.'
+                : authMode === 'signin'
+                  ? 'Sign in to save favorites and recommend professionals.'
+                  : 'Join your neighborhood and discover trusted local pros.'}
             </DialogDescription>
           </DialogHeader>
           
@@ -257,28 +288,49 @@ export function Header() {
                 required
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Password</label>
-              <Input
-                type="password"
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                required
-                minLength={6}
-              />
-            </div>
-            
+            {authMode !== 'reset' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Password</label>
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  value={formData.password}
+                  onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                  required
+                  minLength={6}
+                />
+                {authMode === 'signin' && (
+                  <button
+                    type="button"
+                    className="text-xs text-primary hover:underline"
+                    onClick={() => setAuthMode('reset')}
+                  >
+                    Forgot password?
+                  </button>
+                )}
+              </div>
+            )}
+
             <Button type="submit" className="w-full" disabled={authLoading}>
-              {authLoading ? 'Loading...' : authMode === 'signin' ? 'Sign In' : 'Create Account'}
+              {authLoading ? 'Loading...' : authMode === 'reset' ? 'Send Reset Link' : authMode === 'signin' ? 'Sign In' : 'Create Account'}
             </Button>
           </form>
 
           <div className="mt-4 text-center text-sm text-muted-foreground">
-            {authMode === 'signin' ? (
+            {authMode === 'reset' ? (
+              <>
+                Remember your password?{' '}
+                <button
+                  className="text-primary hover:underline"
+                  onClick={() => setAuthMode('signin')}
+                >
+                  Sign in
+                </button>
+              </>
+            ) : authMode === 'signin' ? (
               <>
                 Don't have an account?{' '}
-                <button 
+                <button
                   className="text-primary hover:underline"
                   onClick={() => setAuthMode('signup')}
                 >
@@ -288,7 +340,7 @@ export function Header() {
             ) : (
               <>
                 Already have an account?{' '}
-                <button 
+                <button
                   className="text-primary hover:underline"
                   onClick={() => setAuthMode('signin')}
                 >
