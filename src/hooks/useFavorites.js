@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { FAVORITE_WITH_BUSINESS_SELECT } from '@/lib/supabaseQueries'
 
 export function useFavorites() {
   const { user, loading: authLoading } = useAuth()
@@ -32,33 +33,7 @@ export function useFavorites() {
 
       const { data, error } = await supabase
         .from('favorites')
-        .select(`
-          id,
-          business_id,
-          business:businesses (
-            id,
-            name,
-            description,
-            phone,
-            email,
-            website,
-            business_services (
-              service:services (
-                id,
-                name,
-                subcategory:subcategories (
-                  id,
-                  name,
-                  category:categories (
-                    id,
-                    name,
-                    emoji
-                  )
-                )
-              )
-            )
-          )
-        `)
+        .select(FAVORITE_WITH_BUSINESS_SELECT)
         .eq('user_id', user.id)
 
       if (error) throw error
@@ -74,8 +49,9 @@ export function useFavorites() {
     return favorites.some(f => f.business_id === businessId)
   }, [favorites])
 
+  // Returns { added: boolean } indicating if it was added (true) or removed (false)
   async function toggleFavorite(businessId) {
-    if (!user) return
+    if (!user) return { added: false }
 
     const existing = favorites.find(f => f.business_id === businessId)
 
@@ -92,7 +68,9 @@ export function useFavorites() {
         // Revert on error
         setFavorites(prev => [...prev, existing])
         console.error('Error removing favorite:', error)
+        return { added: false, error }
       }
+      return { added: false }
     } else {
       // Optimistic update - add
       const tempFavorite = { 
@@ -105,42 +83,18 @@ export function useFavorites() {
       const { data, error } = await supabase
         .from('favorites')
         .insert({ user_id: user.id, business_id: businessId })
-        .select(`
-          id,
-          business_id,
-          business:businesses (
-            id,
-            name,
-            description,
-            phone,
-            email,
-            website,
-            business_services (
-              service:services (
-                id,
-                name,
-                subcategory:subcategories (
-                  id,
-                  name,
-                  category:categories (
-                    id,
-                    name,
-                    emoji
-                  )
-                )
-              )
-            )
-          )
-        `)
+        .select(FAVORITE_WITH_BUSINESS_SELECT)
         .single()
 
       if (error) {
         // Revert on error
         setFavorites(prev => prev.filter(f => f.id !== tempFavorite.id))
         console.error('Error adding favorite:', error)
+        return { added: true, error }
       } else {
         // Replace temp with real data
         setFavorites(prev => prev.map(f => f.id === tempFavorite.id ? data : f))
+        return { added: true }
       }
     }
   }

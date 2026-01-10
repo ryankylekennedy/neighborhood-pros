@@ -1,78 +1,19 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence } from 'framer-motion'
 import { Menu, X, User, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
-import { supabase } from '@/lib/supabase'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
 import { toast } from '@/hooks/useToast'
+import { AuthDialog } from '@/components/AuthDialog'
+import { MobileMenu } from '@/components/MobileMenu'
 
 export function Header() {
-  const { user, profile, signIn, signUp, signOut, loading } = useAuth()
+  const { user, profile, signOut, loading } = useAuth()
   const navigate = useNavigate()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [authDialogOpen, setAuthDialogOpen] = useState(false)
-  const [authMode, setAuthMode] = useState('signin') // 'signin', 'signup', or 'reset'
-  const [authLoading, setAuthLoading] = useState(false)
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    fullName: ''
-  })
-
-  const handleAuthSubmit = async (e) => {
-    e.preventDefault()
-    setAuthLoading(true)
-
-    try {
-      if (authMode === 'reset') {
-        const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
-          redirectTo: `${window.location.origin}/reset-password`
-        })
-        if (error) throw error
-        toast({
-          title: "Check your email",
-          description: "We sent you a password reset link.",
-          variant: "success"
-        })
-        setAuthDialogOpen(false)
-      } else if (authMode === 'signup') {
-        const { error } = await signUp(formData.email, formData.password, formData.fullName)
-        if (error) throw error
-        toast({
-          title: "Check your email",
-          description: "We sent you a confirmation link to complete signup.",
-          variant: "success"
-        })
-        setAuthDialogOpen(false)
-      } else {
-        const { error } = await signIn(formData.email, formData.password)
-        if (error) throw error
-        toast({
-          title: "Welcome back!",
-          description: "You're now signed in.",
-          variant: "success"
-        })
-        setAuthDialogOpen(false)
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive"
-      })
-    } finally {
-      setAuthLoading(false)
-    }
-  }
+  const [authMode, setAuthMode] = useState('signin')
 
   const handleSignOut = async () => {
     await signOut()
@@ -173,184 +114,29 @@ export function Header() {
 
         {/* Mobile Menu */}
         <AnimatePresence>
-          {mobileMenuOpen && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="md:hidden border-t bg-background"
-            >
-              <div className="container mx-auto px-4 py-4 flex flex-col gap-2">
-                <Link
-                  to="/"
-                  className="px-4 py-3 rounded-lg hover:bg-muted transition-colors"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Browse Professionals
-                </Link>
-                {user && profile?.neighborhood_id && (
-                  <Link
-                    to="/admin/invites"
-                    className="px-4 py-3 rounded-lg hover:bg-muted transition-colors"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Manage Invites
-                  </Link>
-                )}
-                <div className="border-t my-2" />
-                {user ? (
-                  <>
-                    <Link 
-                      to="/profile" 
-                      className="px-4 py-3 rounded-lg hover:bg-muted transition-colors flex items-center gap-2"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <User size={18} />
-                      {profile?.full_name || 'Profile'}
-                    </Link>
-                    <button 
-                      className="px-4 py-3 rounded-lg hover:bg-muted transition-colors flex items-center gap-2 text-left w-full"
-                      onClick={() => {
-                        handleSignOut()
-                        setMobileMenuOpen(false)
-                      }}
-                    >
-                      <LogOut size={18} />
-                      Sign Out
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button 
-                      className="px-4 py-3 rounded-lg hover:bg-muted transition-colors text-left"
-                      onClick={() => {
-                        setAuthMode('signin')
-                        setAuthDialogOpen(true)
-                        setMobileMenuOpen(false)
-                      }}
-                    >
-                      Sign In
-                    </button>
-                    <Button 
-                      className="mx-4"
-                      onClick={() => {
-                        setAuthMode('signup')
-                        setAuthDialogOpen(true)
-                        setMobileMenuOpen(false)
-                      }}
-                    >
-                      Get Started
-                    </Button>
-                  </>
-                )}
-              </div>
-            </motion.div>
-          )}
+          <MobileMenu
+            isOpen={mobileMenuOpen}
+            onClose={() => setMobileMenuOpen(false)}
+            user={user}
+            profile={profile}
+            onSignOut={handleSignOut}
+            onSignInClick={() => {
+              setAuthMode('signin')
+              setAuthDialogOpen(true)
+            }}
+            onSignUpClick={() => {
+              setAuthMode('signup')
+              setAuthDialogOpen(true)
+            }}
+          />
         </AnimatePresence>
       </header>
 
-      {/* Auth Dialog */}
-      <Dialog open={authDialogOpen} onOpenChange={setAuthDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">
-              {authMode === 'reset' ? 'Reset password' : authMode === 'signin' ? 'Welcome back' : 'Create an account'}
-            </DialogTitle>
-            <DialogDescription>
-              {authMode === 'reset'
-                ? 'Enter your email and we\'ll send you a password reset link.'
-                : authMode === 'signin'
-                  ? 'Sign in to save favorites and recommend professionals.'
-                  : 'Join your neighborhood and discover trusted local pros.'}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <form onSubmit={handleAuthSubmit} className="space-y-4 mt-4">
-            {authMode === 'signup' && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Full Name</label>
-                <Input
-                  type="text"
-                  placeholder="Your name"
-                  value={formData.fullName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
-                  required={authMode === 'signup'}
-                />
-              </div>
-            )}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Email</label>
-              <Input
-                type="email"
-                placeholder="you@example.com"
-                value={formData.email}
-                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                required
-              />
-            </div>
-            {authMode !== 'reset' && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Password</label>
-                <Input
-                  type="password"
-                  placeholder="••••••••"
-                  value={formData.password}
-                  onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                  required
-                  minLength={6}
-                />
-                {authMode === 'signin' && (
-                  <button
-                    type="button"
-                    className="text-xs text-primary hover:underline"
-                    onClick={() => setAuthMode('reset')}
-                  >
-                    Forgot password?
-                  </button>
-                )}
-              </div>
-            )}
-
-            <Button type="submit" className="w-full" disabled={authLoading}>
-              {authLoading ? 'Loading...' : authMode === 'reset' ? 'Send Reset Link' : authMode === 'signin' ? 'Sign In' : 'Create Account'}
-            </Button>
-          </form>
-
-          <div className="mt-4 text-center text-sm text-muted-foreground">
-            {authMode === 'reset' ? (
-              <>
-                Remember your password?{' '}
-                <button
-                  className="text-primary hover:underline"
-                  onClick={() => setAuthMode('signin')}
-                >
-                  Sign in
-                </button>
-              </>
-            ) : authMode === 'signin' ? (
-              <>
-                Don't have an account?{' '}
-                <button
-                  className="text-primary hover:underline"
-                  onClick={() => setAuthMode('signup')}
-                >
-                  Sign up
-                </button>
-              </>
-            ) : (
-              <>
-                Already have an account?{' '}
-                <button
-                  className="text-primary hover:underline"
-                  onClick={() => setAuthMode('signin')}
-                >
-                  Sign in
-                </button>
-              </>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <AuthDialog
+        open={authDialogOpen}
+        onOpenChange={setAuthDialogOpen}
+        initialMode={authMode}
+      />
     </>
   )
 }

@@ -53,16 +53,10 @@ export function BusinessDetailPage() {
       return
     }
 
-    // Check if it's currently favorited BEFORE toggling
-    const wasAlreadyFavorited = isFavorite(id)
-
-    await toggleFavorite(id)
-
-    // If it wasn't favorited before, it was just added - show dialog
-    if (!wasAlreadyFavorited) {
+    const { added } = await toggleFavorite(id)
+    if (added) {
       setShowBookmarkDialog(true)
     } else {
-      // It was favorited before, so it was just removed
       toast({
         title: "Removed from favorites",
         variant: "default"

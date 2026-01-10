@@ -10,6 +10,7 @@ import { useFavorites } from '@/hooks/useFavorites'
 import { useAuth } from '@/hooks/useAuth'
 import { toast } from '@/hooks/useToast'
 import { BookmarkDialog } from '@/components/BookmarkDialog'
+import { POPULAR_SEARCHES, PAGINATION, ANIMATION } from '@/lib/constants'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,18 +30,10 @@ export function HomePage() {
   const [isSearchFocused, setIsSearchFocused] = useState(false)
   const searchInputRef = useRef(null)
 
-  // Popular search suggestions
-  const popularSearches = [
-    'Looking for a weekly house cleaner',
-    'I need a handyman for a few small jobs',
-    'Monthly lawn care and gardening'
-  ]
-
   const { businesses, loading, hasMore, loadMore } = useBusinesses({
     subcategoryId: selectedSubcategoryId,
     serviceId: selectedServiceId,
-    searchQuery,
-    limit: 12
+    searchQuery
   })
 
   const { categories } = useCategories()
@@ -75,8 +68,8 @@ export function HomePage() {
       )
       .map(subcategory => ({ ...subcategory, type: 'subcategory' }))
 
-    // Combine and limit to 8 suggestions (prioritize subcategories)
-    return [...matchingSubcategories, ...matchingServices].slice(0, 8)
+    // Combine and limit suggestions (prioritize subcategories)
+    return [...matchingSubcategories, ...matchingServices].slice(0, PAGINATION.AUTOCOMPLETE_LIMIT)
   }, [searchQuery, services, allSubcategories])
 
   const handleFavoriteClick = async (business) => {
@@ -89,13 +82,8 @@ export function HomePage() {
       return
     }
 
-    // Check if it's currently favorited BEFORE toggling
-    const wasAlreadyFavorited = isFavorite(business.id)
-
-    await toggleFavorite(business.id)
-
-    // If it wasn't favorited before, it was just added - show dialog
-    if (!wasAlreadyFavorited) {
+    const { added } = await toggleFavorite(business.id)
+    if (added) {
       setSelectedBusiness(business)
       setShowBookmarkDialog(true)
     }
@@ -275,7 +263,7 @@ export function HomePage() {
                           key={`${item.type}-${item.id}`}
                           initial={{ opacity: 0, x: -10 }}
                           animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: index * 0.03 }}
+                          transition={{ delay: index * ANIMATION.SUGGESTION_DELAY }}
                           onClick={() => handleAutocompleteSelect(item)}
                           className="text-left px-3 py-2 rounded-md hover:bg-muted transition-colors focused-search-content"
                         >
@@ -324,12 +312,12 @@ export function HomePage() {
                 <div className="px-4 py-6 flex-1 overflow-y-auto focused-search-content">
                   <h3 className="text-base font-medium mb-4 text-foreground/60">Popular searches</h3>
                   <div className="flex flex-col gap-2">
-                    {popularSearches.map((search, index) => (
+                    {POPULAR_SEARCHES.map((search, index) => (
                       <motion.button
                         key={index}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.05 }}
+                        transition={{ delay: index * ANIMATION.STAGGER_DELAY }}
                         onClick={() => handlePopularSearchClick(search)}
                         className={`text-left px-4 py-4 rounded-lg transition-colors ${
                           index === 2
@@ -479,7 +467,7 @@ export function HomePage() {
                   isFavorite={isFavorite(business.id)}
                   onFavoriteClick={handleFavoriteClick}
                   onClick={handleCardClick}
-                  animationDelay={index * 0.05}
+                  animationDelay={index * ANIMATION.STAGGER_DELAY}
                 />
               ))}
             </div>
